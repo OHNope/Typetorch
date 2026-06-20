@@ -51,6 +51,17 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Cache xmake installation
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/bin/xmake
+            ~/.local/bin/xrepo
+            ~/.local/share/xmake
+          key: ${{ runner.os }}-gcc16-xmake-install-${{ hashFiles('scripts/bootstrap_xmake.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-gcc16-xmake-install-
+
       - name: Cache xmake packages
         uses: actions/cache@v4
         with:
@@ -63,9 +74,11 @@ jobs:
 
       - name: Install xmake
         run: |
-          bash scripts/bootstrap_xmake.sh
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           export PATH="$HOME/.local/bin:$PATH"
+          if ! command -v xmake >/dev/null 2>&1; then
+            bash scripts/bootstrap_xmake.sh
+          fi
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           xmake --version
 
       - name: Configure environment

@@ -141,34 +141,47 @@ Release build, CPU tensors, 1 thread, 1000 iterations. Ratio is
 
 ### Symbol Growth Probe
 
-Debug/no-inline `binary_size_libtorch_probe` and `binary_size_tensor_probe`,
-summarized with `scripts/nm_size_probe.sh debug`. Both probes print `16` and run
-the same high-level retain/add/unwrap/numel flow; the first uses only native
-`at::Tensor`, while the second routes the typed paths through Typetorch.
+Binary-size probes now separate the two Typetorch usage modes that matter for
+interpretation:
 
-| Symbol group | Bytes | Symbols | Interpretation |
-| --- | ---: | ---: | --- |
-| Native probe functions | 486 | 9 | Native `at::Tensor` equivalent helper functions. |
-| Typed probe functions | 768 | 9 | Typetorch helper functions with the same call flow. |
-| Typed/native probe function ratio | 1.580x | - | +282 bytes in the noinline helper layer. |
-| Tensor wrapper nm records | 432 | 7 | `Tensor` wrapper records, including ABI alias records. |
-| Tensor wrapper unique code addresses | 321 | 4 | Same wrapper set folded by address; this is the better code-entity count. |
-| Runtime check symbols | 700 | 5 | Runtime shape/dtype/device/layout contract checks. |
+| Target | Role |
+| --- | --- |
+| `binary_size_libtorch_probe` | Native LibTorch baseline using only `at::Tensor`. |
+| `binary_size_tensor_checked_probe` | Fully checked Typetorch boundary: raw tensors enter through `retain()`. |
+| `binary_size_tensor_unsafe_probe` | Fully trusted Typetorch boundary: raw tensors enter through `unsafe_retain()`. |
+| `binary_size_tensor_probe` | Legacy mixed probe; keep only for comparing older measurements. |
+
+Run the symbol report locally on an interactive machine:
+
+```bash
+bash scripts/nm_size_probe.sh debug
+```
+
+All three current probes print `16` and run the same high-level
+retain/add/unwrap/numel flow. Compare checked vs native for the full contract
+cost, unsafe vs native for trusted forwarding overhead, and checked vs unsafe
+for the isolated runtime validation cost.
 
 ### Binary Size Snapshot
 
-| Target | Mode | File size | `.text` | `.data` | `.bss` | `size` total |
-| --- | --- | ---: | ---: | ---: | ---: | ---: |
-| `typetorch_forwarding_benchmark` | release | 51 KiB | 43,157 | 1,480 | 200 | 44,837 |
-| `binary_size_libtorch_probe` | release | 59 KiB | 48,394 | 1,376 | 200 | 49,970 |
-| `binary_size_tensor_probe` | release | 63 KiB | 49,659 | 1,400 | 200 | 51,259 |
-| `typetorch_tensor_arithmetic_test` | release | 83 KiB | 72,948 | 1,672 | 200 | 74,820 |
-| `binary_size_libtorch_probe` | debug | 3.9 MiB | 156,908 | 1,272 | 200 | 158,380 |
-| `binary_size_tensor_probe` | debug | 6.2 MiB | 210,713 | 1,320 | 200 | 212,233 |
+Build release measurement targets manually; they are intentionally not part of
+CI:
 
-Compared to the native LibTorch probe, the typed Typetorch probe is 4,120 file
-bytes and 1,265 `.text` bytes larger in release mode, or about +6.9% file size
-and +2.6% `.text`.
+```bash
+source scripts/env.sh
+xmake f -m release --yes --python="${PYTHON:-python3}"
+xmake build typetorch_forwarding_benchmark
+xmake build binary_size_libtorch_probe
+xmake build binary_size_tensor_checked_probe
+xmake build binary_size_tensor_unsafe_probe
+size \
+  build/linux/x86_64/release/binary_size_libtorch_probe \
+  build/linux/x86_64/release/binary_size_tensor_checked_probe \
+  build/linux/x86_64/release/binary_size_tensor_unsafe_probe
+```
+
+The older `binary_size_tensor_probe` mixed checked and unsafe retain paths, so
+it should not be used as the headline Typetorch-vs-LibTorch comparison.
 
 ## Documentation
 

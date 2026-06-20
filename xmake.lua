@@ -3,6 +3,13 @@ set_version("0.1.0")
 set_languages("c++26")
 set_policy("build.c++.modules.gcc.cxx11abi", true)
 
+local gcc_relocate_ldflags = os.getenv("TYPETORCH_GCC_RELOCATE_LDFLAGS")
+if gcc_relocate_ldflags and gcc_relocate_ldflags ~= "" then
+    for flag in gcc_relocate_ldflags:gmatch("%S+") do
+        add_ldflags(flag, {force = true})
+    end
+end
+
 add_rules("mode.debug", "mode.release")
 add_repositories("local-repo .")
 add_cxxflags("-fmodules", "-freflection", "-Wall"," -Wextra","-fvisibility=hidden", {force = true})
@@ -170,6 +177,36 @@ target("binary_size_tensor_probe")
     add_rules("libtorch_runtime", "python_headers")
     add_packages("libtorch")
     add_files("src/fastio.mpp", "src/fastio.cpp", "tests/binary_size_tensor_probe.cpp")
+    add_typetorch_modules()
+    add_includedirs("third_party/fast_io/include")
+    if is_mode("debug") then
+        add_cxxflags("-O0", "-g3", "-fno-inline", "-fno-omit-frame-pointer")
+    elseif is_mode("release") then
+        add_cxxflags("-O2", "-g1", "-fno-omit-frame-pointer")
+    end
+target_end()
+
+target("binary_size_tensor_checked_probe")
+    set_default(false)
+    set_kind("binary")
+    add_rules("libtorch_runtime", "python_headers")
+    add_packages("libtorch")
+    add_files("src/fastio.mpp", "src/fastio.cpp", "tests/binary_size_tensor_checked_probe.cpp")
+    add_typetorch_modules()
+    add_includedirs("third_party/fast_io/include")
+    if is_mode("debug") then
+        add_cxxflags("-O0", "-g3", "-fno-inline", "-fno-omit-frame-pointer")
+    elseif is_mode("release") then
+        add_cxxflags("-O2", "-g1", "-fno-omit-frame-pointer")
+    end
+target_end()
+
+target("binary_size_tensor_unsafe_probe")
+    set_default(false)
+    set_kind("binary")
+    add_rules("libtorch_runtime", "python_headers")
+    add_packages("libtorch")
+    add_files("src/fastio.mpp", "src/fastio.cpp", "tests/binary_size_tensor_unsafe_probe.cpp")
     add_typetorch_modules()
     add_includedirs("third_party/fast_io/include")
     if is_mode("debug") then
