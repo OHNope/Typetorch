@@ -1,8 +1,8 @@
-export module tenspec:common;
+export module typetorch:common;
 
 export import :types;
 
-export namespace tenspec
+export namespace typetorch
 {
 
 consteval inline auto common_dtype(DType const LhsDType,
@@ -25,4 +25,4 @@ consteval inline auto is_floating_dtype(DType dtype) noexcept -> bool
 }
 } // namespace detail
 
-} // namespace tenspec
+} // namespace typetorch

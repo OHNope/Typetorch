@@ -1,6 +1,6 @@
 import std;
 import python;
-import tenspec.capi_bridge;
+import typetorch.capi_bridge;
 
 namespace py = python;
 
@@ -17,7 +17,7 @@ struct python_function
 
 ::std::deque<python_function> functions;
 
-void collect_function(tenspec_python_function const *function, void *) noexcept
+void collect_function(typetorch_python_function const *function, void *) noexcept
 {
 	if (!function || !function->name || !function->invoke)
 	{
@@ -31,12 +31,12 @@ void collect_function(tenspec_python_function const *function, void *) noexcept
 }
 
 py::PyModuleDef module = py::module_def(
-	"tenspec_capi",
+	"typetorch_capi",
 	"Minimal typed tensor bindings backed by libtorch and the Python C API.");
 
 } // namespace
 
-extern "C" __attribute__((visibility("default"))) auto PyInit_tenspec_capi()
+extern "C" __attribute__((visibility("default"))) auto PyInit_typetorch_capi()
 	-> py::PyObject *
 {
 	py::PyObject *torch = py::PyImport_ImportModule("torch");
@@ -53,7 +53,7 @@ extern "C" __attribute__((visibility("default"))) auto PyInit_tenspec_capi()
 	}
 
 	functions.clear();
-	tenspec_python_for_each_function(collect_function, nullptr);
+	typetorch_python_for_each_function(collect_function, nullptr);
 
 	for (auto &function : functions)
 	{

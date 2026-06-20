@@ -1,4 +1,4 @@
-export module tenspec;
+export module typetorch;
 
 export import std;
 export import libtorch;

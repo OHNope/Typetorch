@@ -1,4 +1,4 @@
-export module tenspec:tensor;
+export module typetorch:tensor;
 
 import std;
 import libtorch;
@@ -11,55 +11,55 @@ export import :runtime_checks;
 #include "attribute.inc"
 
 #define BROADCAST_COMPATIBLE(LShape, RShape) \
-	(::tenspec::detail::broadcast_compatible(LShape::dims, RShape::dims))
+	(::typetorch::detail::broadcast_compatible(LShape::dims, RShape::dims))
 
 #define BROADCAST_SHAPE_T(LShape, RShape)               \
-	typename[: ::tenspec::detail::broadcast_shape_meta( \
+	typename[: ::typetorch::detail::broadcast_shape_meta( \
 				   LShape::dims, RShape::dims):]
 
 #define MATMUL_SHAPE_T(LShape, RShape)               \
-	typename[: ::tenspec::detail::matmul_shape_meta( \
+	typename[: ::typetorch::detail::matmul_shape_meta( \
 				   LShape::dims, RShape::dims):]
 
 #define TRANSPOSE_SHAPE_T(ShapeKind, Dim0, Dim1)        \
-	typename[: ::tenspec::detail::transpose_shape_meta( \
+	typename[: ::typetorch::detail::transpose_shape_meta( \
 				   ShapeKind::dims, Dim0, Dim1):]
 
 #define TRANSPOSE_LAYOUT(ShapeKind, LayoutKind, Dim0, Dim1) \
-	(::tenspec::detail::transpose_layout(LayoutKind, ShapeKind::dims, Dim0, Dim1))
+	(::typetorch::detail::transpose_layout(LayoutKind, ShapeKind::dims, Dim0, Dim1))
 
 #define PERMUTE_SHAPE_T(ShapeKind, PermuteDims)       \
-	typename[: ::tenspec::detail::permute_shape_meta( \
+	typename[: ::typetorch::detail::permute_shape_meta( \
 				   ShapeKind::dims, PermuteDims):]
 
 #define PERMUTE_LAYOUT(ShapeKind, LayoutKind, PermuteDims) \
-	(::tenspec::detail::permute_layout(LayoutKind, ShapeKind::dims, PermuteDims))
+	(::typetorch::detail::permute_layout(LayoutKind, ShapeKind::dims, PermuteDims))
 
 #define VIEW_SHAPE_T(ShapeKind, ResultDims)        \
-	typename[: ::tenspec::detail::view_shape_meta( \
+	typename[: ::typetorch::detail::view_shape_meta( \
 				   ShapeKind::dims, ResultDims):]
 
 #define FLATTEN_SHAPE_T(ShapeKind, StartDim, EndDim)  \
-	typename[: ::tenspec::detail::flatten_shape_meta( \
+	typename[: ::typetorch::detail::flatten_shape_meta( \
 				   ShapeKind::dims, StartDim, EndDim):]
 
 #define SQUEEZE_SHAPE_T(ShapeKind)                    \
-	typename[: ::tenspec::detail::squeeze_shape_meta( \
+	typename[: ::typetorch::detail::squeeze_shape_meta( \
 				   ShapeKind::dims):]
 
 #define SQUEEZE_DIM_SHAPE_T(ShapeKind, Dim)           \
-	typename[: ::tenspec::detail::squeeze_shape_meta( \
+	typename[: ::typetorch::detail::squeeze_shape_meta( \
 				   ShapeKind::dims, Dim):]
 
 #define UNSQUEEZE_SHAPE_T(ShapeKind, Dim)               \
-	typename[: ::tenspec::detail::unsqueeze_shape_meta( \
+	typename[: ::typetorch::detail::unsqueeze_shape_meta( \
 				   ShapeKind::dims, Dim):]
 
 #define NORMALIZED_SHAPE_COMPATIBLE(InputShape, NormalizedShape) \
-	(::tenspec::detail::normalized_shape_compatible(             \
+	(::typetorch::detail::normalized_shape_compatible(             \
 		InputShape::dims, NormalizedShape::dims))
 
-export namespace tenspec
+export namespace typetorch
 {
 
 namespace detail
@@ -96,12 +96,12 @@ public:
 	inline Tensor(Tensor &&) noexcept = default;
 	inline auto operator=(Tensor &&) noexcept -> Tensor & = default;
 
-	[[nodiscard]] TENSPEC_ALWAYS_INLINE auto unsafe_raw() const & noexcept -> ::at::Tensor const &
+	[[nodiscard]] TYPETORCH_ALWAYS_INLINE auto unsafe_raw() const & noexcept -> ::at::Tensor const &
 	{
 		return impl_;
 	}
 
-	[[nodiscard]] TENSPEC_ALWAYS_INLINE auto unwrap() && noexcept -> ::at::Tensor
+	[[nodiscard]] TYPETORCH_ALWAYS_INLINE auto unwrap() && noexcept -> ::at::Tensor
 	{
 		return ::std::move(impl_);
 	}
@@ -138,8 +138,8 @@ public:
 		static_assert(device != Device::Any,
 					  "Tensor::arange() requires a concrete device");
 
-		using Result = ::tenspec::Tensor<
-			::tenspec::Shape<detail::static_arange_size(start, end, step)>, dtype,
+		using Result = ::typetorch::Tensor<
+			::typetorch::Shape<detail::static_arange_size(start, end, step)>, dtype,
 			device, Layout::Contiguous>;
 		return Result::unsafe_move(
 			::at::arange(static_cast<::std::int64_t>(start),
@@ -159,14 +159,14 @@ public:
 		return unsafe_retain(raw);
 	}
 
-	[[nodiscard]] TENSPEC_ALWAYS_INLINE static auto unsafe_retain(::at::Tensor const &raw) noexcept
+	[[nodiscard]] TYPETORCH_ALWAYS_INLINE static auto unsafe_retain(::at::Tensor const &raw) noexcept
 		-> Tensor
 	{
 		::at::Tensor retained{raw};
 		return Tensor(::std::move(retained)); // get the copy of the raw
 	}
 
-	[[nodiscard]] TENSPEC_ALWAYS_INLINE static auto unsafe_move(::at::Tensor &&raw) noexcept -> Tensor
+	[[nodiscard]] TYPETORCH_ALWAYS_INLINE static auto unsafe_move(::at::Tensor &&raw) noexcept -> Tensor
 	{
 		return Tensor(::std::move(raw));
 	}
@@ -228,7 +228,7 @@ public:
 	}
 
 	template <TensorLike Other>
-	[[nodiscard]] TENSPEC_ALWAYS_INLINE auto add(Other const &other,
+	[[nodiscard]] TYPETORCH_ALWAYS_INLINE auto add(Other const &other,
 												 ::at::Scalar const &alpha = 1) const
 	{
 		using OtherShape = typename Other::shape;
@@ -323,7 +323,7 @@ public:
 	{
 		using Result =
 			Tensor<TRANSPOSE_SHAPE_T(shape, Dim0, Dim1), dtype, device,
-				   ::tenspec::detail::transpose_layout(layout, shape::dims, Dim0,
+				   ::typetorch::detail::transpose_layout(layout, shape::dims, Dim0,
 													   Dim1)>;
 		return Result::unsafe_move(unsafe_raw().transpose(Dim0, Dim1));
 	}
@@ -609,13 +609,13 @@ public:
 		return retain(raw);
 	}
 
-	[[nodiscard]] TENSPEC_ALWAYS_INLINE auto unsafe_wrap(::at::Tensor const &raw) noexcept
+	[[nodiscard]] TYPETORCH_ALWAYS_INLINE auto unsafe_wrap(::at::Tensor const &raw) noexcept
 
 	{
 		return unsafe_retain(raw);
 	}
 
-	[[nodiscard]] TENSPEC_ALWAYS_INLINE auto unsafe_wrap(::at::Tensor &&raw) noexcept
+	[[nodiscard]] TYPETORCH_ALWAYS_INLINE auto unsafe_wrap(::at::Tensor &&raw) noexcept
 
 	{
 		return unsafe_move(raw);
@@ -658,4 +658,4 @@ private:
 	::at::Tensor impl_;
 };
 
-} // namespace tenspec
+} // namespace typetorch

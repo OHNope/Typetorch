@@ -1,6 +1,6 @@
 import std;
 import libtorch;
-import tenspec.examples;
+import typetorch.examples;
 import fastio;
 
 namespace
@@ -45,43 +45,43 @@ int main()
 	auto weight{tensor({1.0F, 2.0F, 0.0F, 1.0F, 1.0F, 0.0F}).view({3, 2})};
 	auto bias{tensor({0.5F, -0.5F, 1.0F})};
 
-	auto x_t{tenspec_examples::Vector::retain(x)};
-	auto y_t{tenspec_examples::Vector::retain(y)};
-	auto rows_t{tenspec_examples::Matrix::retain(rows)};
-	auto rows3_t{tenspec_examples::Matrix3In::retain(rows)};
-	auto weight_t{tenspec_examples::Matrix3Out::retain(weight)};
-	auto bias_t{tenspec_examples::Vector::retain(bias)};
+	auto x_t{typetorch_examples::Vector::retain(x)};
+	auto y_t{typetorch_examples::Vector::retain(y)};
+	auto rows_t{typetorch_examples::Matrix::retain(rows)};
+	auto rows3_t{typetorch_examples::Matrix3In::retain(rows)};
+	auto weight_t{typetorch_examples::Matrix3Out::retain(weight)};
+	auto bias_t{typetorch_examples::Vector::retain(bias)};
 
 	print_tensor_summary(
 		"checked_vector_sizes",
-		::std::move(tenspec_examples::checked_vector_sizes(x_t)).unwrap());
+		::std::move(typetorch_examples::checked_vector_sizes(x_t)).unwrap());
 	print_tensor_summary(
 		"add_vectors",
-		::std::move(tenspec_examples::add_vectors(x_t, y_t)).unwrap());
+		::std::move(typetorch_examples::add_vectors(x_t, y_t)).unwrap());
 	print_tensor_summary(
 		"add_bias",
-		::std::move(tenspec_examples::add_bias(rows_t, bias_t)).unwrap());
+		::std::move(typetorch_examples::add_bias(rows_t, bias_t)).unwrap());
 	print_tensor_summary(
 		"matmul_3_inner",
-		::std::move(tenspec_examples::matmul_3_inner(rows3_t, weight_t)).unwrap());
+		::std::move(typetorch_examples::matmul_3_inner(rows3_t, weight_t)).unwrap());
 	print_tensor_summary(
 		"linear_3_to_2",
-		::std::move(tenspec_examples::linear_3_to_2(rows3_t)).unwrap());
+		::std::move(typetorch_examples::linear_3_to_2(rows3_t)).unwrap());
 	print_tensor_summary(
 		"transpose_matrix",
-		::std::move(tenspec_examples::transpose_matrix(rows_t)).unwrap());
+		::std::move(typetorch_examples::transpose_matrix(rows_t)).unwrap());
 	::fast_io::io::println("numel_plus: ",
-						   tenspec_examples::numel_plus(rows_t, 4));
+						   typetorch_examples::numel_plus(rows_t, 4));
 
 	using StaticVector =
-		tenspec::Tensor<tenspec::Shape<6>, tenspec::DType::F32,
-						tenspec::Device::CPU, tenspec::Layout::Contiguous>;
+		typetorch::Tensor<typetorch::Shape<6>, typetorch::DType::F32,
+						typetorch::Device::CPU, typetorch::Layout::Contiguous>;
 	using StaticMatrix =
-		tenspec::Tensor<tenspec::Shape<2, 3>, tenspec::DType::F32,
-						tenspec::Device::CPU, tenspec::Layout::Contiguous>;
+		typetorch::Tensor<typetorch::Shape<2, 3>, typetorch::DType::F32,
+						typetorch::Device::CPU, typetorch::Layout::Contiguous>;
 	using StaticCube =
-		tenspec::Tensor<tenspec::Shape<2, 3, 4>, tenspec::DType::F32,
-						tenspec::Device::CPU, tenspec::Layout::Contiguous>;
+		typetorch::Tensor<typetorch::Shape<2, 3, 4>, typetorch::DType::F32,
+						typetorch::Device::CPU, typetorch::Layout::Contiguous>;
 
 	auto options{::at::TensorOptions().dtype(::at::kFloat).device(::at::kCPU)};
 	auto matrix_raw{::at::arange(6, options).view({2, 3})};
@@ -103,7 +103,7 @@ int main()
 						 ::std::move(StaticMatrix::arange<0, 6>()).unwrap());
 	print_tensor_summary(
 		"Tensor::arange_step",
-		::std::move(StaticMatrix::arange<0, 6, 2, tenspec::DType::I64>())
+		::std::move(StaticMatrix::arange<0, 6, 2, typetorch::DType::I64>())
 			.unwrap());
 	print_tensor_summary(
 		"unsafe_retain_raw",
@@ -146,6 +146,6 @@ int main()
 			.unwrap());
 	auto static_vector{StaticVector::retain(
 		::at::arange(6, options).view({6}))};
-	::fast_io::io::println("tenspec::sizes: ",
+	::fast_io::io::println("typetorch::sizes: ",
 						   static_vector.sizes().size());
 }

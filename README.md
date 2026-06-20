@@ -1,11 +1,11 @@
-# Tenspec
+# Typetorch
 
-Tenspec is an experimental C++26 project for type-safe LibTorch tensor wrappers
+Typetorch is an experimental C++26 project for type-safe LibTorch tensor wrappers
 and lightweight Python C API bindings.
 
 The core wrapper carries tensor shape, dtype, device, and layout information in
 C++ types while forwarding runtime work to LibTorch. LibTorch still owns tensor
-storage, kernels, dispatch, autograd, and device behavior; Tenspec adds a typed
+storage, kernels, dispatch, autograd, and device behavior; Typetorch adds a typed
 contract layer around `at::Tensor`.
 
 ## Status
@@ -23,7 +23,7 @@ Minimum practical requirements:
 | C++ compiler | GCC 16.1 or newer with modules and static reflection support | Older GCC releases are not expected to build this project. |
 | Build system | xmake | Used for C++26 module builds and local package resolution. |
 | LibTorch | 2.8.0 + CUDA 12.8 archive | The repository includes an xmake package recipe in `packages/l/libtorch-bin/`. |
-| Python headers | CPython development headers | Required for `tenspec_capi_ext`. |
+| Python headers | CPython development headers | Required for `typetorch_capi_ext`. |
 | Python runtime | Python with `torch` installed | Required only to import and exercise the extension. |
 | OS/tooling | Linux, `nm`, `size`, common binutils | Measurement scripts assume Unix-like tooling. |
 
@@ -42,8 +42,8 @@ export PYTHON=/path/to/python                       # optional
 Clone and initialize submodules:
 
 ```bash
-git clone <repo-url> tenspec
-cd tenspec
+git clone <repo-url> typetorch
+cd typetorch
 git submodule update --init --recursive
 ```
 
@@ -58,31 +58,31 @@ Configure and run the tensor API test:
 
 ```bash
 xmake f -m debug --yes --python="${PYTHON:-python3}"
-xmake build tenspec_tensor_arithmetic_test
-xmake run tenspec_tensor_arithmetic_test
+xmake build typetorch_tensor_arithmetic_test
+xmake run typetorch_tensor_arithmetic_test
 ```
 
 Build and run the C++ debug example:
 
 ```bash
-xmake build tenspec_cpp_debug
-xmake run tenspec_cpp_debug
+xmake build typetorch_cpp_debug
+xmake run typetorch_cpp_debug
 ```
 
 Build the Python extension:
 
 ```bash
-xmake build tenspec_capi_ext
+xmake build typetorch_capi_ext
 ```
 
 The extension is emitted under `build/<platform>/<arch>/<mode>/` with basename
-`tenspec_capi`.
+`typetorch_capi`.
 
 For release measurements:
 
 ```bash
 xmake f -m release --yes --python="${PYTHON:-python3}"
-xmake build tenspec_forwarding_benchmark
+xmake build typetorch_forwarding_benchmark
 xmake build binary_size_libtorch_probe
 xmake build binary_size_tensor_probe
 ```
@@ -90,13 +90,13 @@ xmake build binary_size_tensor_probe
 ## API Sketch
 
 ```cpp
-import tenspec;
+import typetorch;
 
-using Matrix = tenspec::Tensor<
-    tenspec::Shape<2, 3>,
-    tenspec::DType::F32,
-    tenspec::Device::CPU,
-    tenspec::Layout::Contiguous>;
+using Matrix = typetorch::Tensor<
+    typetorch::Shape<2, 3>,
+    typetorch::DType::F32,
+    typetorch::Device::CPU,
+    typetorch::Layout::Contiguous>;
 
 at::Tensor raw = at::arange(6, options).view({2, 3});
 auto typed = Matrix::retain(raw);        // runtime contract check
@@ -106,7 +106,7 @@ at::Tensor back = std::move(flat).unwrap();
 
 Important differences from ordinary LibTorch code:
 
-| Topic | LibTorch | Tenspec |
+| Topic | LibTorch | Typetorch |
 | --- | --- | --- |
 | Tensor type | Mostly dynamic `at::Tensor` metadata | Shape, dtype, device, and layout are part of the C++ type. |
 | Shape errors | Usually runtime errors | Statically known shape mismatches fail during compilation. |
@@ -116,7 +116,7 @@ Important differences from ordinary LibTorch code:
 | Layout | Runtime property | `Layout::Contiguous`, `Layout::NonContiguous`, or `Layout::Any` can be tracked. |
 
 See [docs/api.md](docs/api.md) for the supported operation style and the places
-where Tenspec intentionally differs from LibTorch.
+where Typetorch intentionally differs from LibTorch.
 
 ## Current Measurement Snapshot
 
@@ -128,9 +128,9 @@ indicative, not as a stable benchmark promise.
 ### Forwarding Performance
 
 Release build, CPU tensors, 1 thread, 1000 iterations. Ratio is
-`Tenspec / raw at::Tensor`; values near 1.0 mean no measurable forwarding loss.
+`Typetorch / raw at::Tensor`; values near 1.0 mean no measurable forwarding loss.
 
-| Operation | Raw ns/op | Tenspec ns/op | Ratio | Overhead |
+| Operation | Raw ns/op | Typetorch ns/op | Ratio | Overhead |
 | --- | ---: | ---: | ---: | ---: |
 | `add.dynamic` | 1984.773 | 1977.399 | 0.9963 | -0.37% |
 | `add.static` | 2008.366 | 1990.744 | 0.9912 | -0.88% |
@@ -144,12 +144,12 @@ Release build, CPU tensors, 1 thread, 1000 iterations. Ratio is
 Debug/no-inline `binary_size_libtorch_probe` and `binary_size_tensor_probe`,
 summarized with `scripts/nm_size_probe.sh debug`. Both probes print `16` and run
 the same high-level retain/add/unwrap/numel flow; the first uses only native
-`at::Tensor`, while the second routes the typed paths through Tenspec.
+`at::Tensor`, while the second routes the typed paths through Typetorch.
 
 | Symbol group | Bytes | Symbols | Interpretation |
 | --- | ---: | ---: | --- |
 | Native probe functions | 486 | 9 | Native `at::Tensor` equivalent helper functions. |
-| Typed probe functions | 768 | 9 | Tenspec helper functions with the same call flow. |
+| Typed probe functions | 768 | 9 | Typetorch helper functions with the same call flow. |
 | Typed/native probe function ratio | 1.580x | - | +282 bytes in the noinline helper layer. |
 | Tensor wrapper nm records | 432 | 7 | `Tensor` wrapper records, including ABI alias records. |
 | Tensor wrapper unique code addresses | 321 | 4 | Same wrapper set folded by address; this is the better code-entity count. |
@@ -159,14 +159,14 @@ the same high-level retain/add/unwrap/numel flow; the first uses only native
 
 | Target | Mode | File size | `.text` | `.data` | `.bss` | `size` total |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| `tenspec_forwarding_benchmark` | release | 51 KiB | 43,157 | 1,480 | 200 | 44,837 |
+| `typetorch_forwarding_benchmark` | release | 51 KiB | 43,157 | 1,480 | 200 | 44,837 |
 | `binary_size_libtorch_probe` | release | 59 KiB | 48,394 | 1,376 | 200 | 49,970 |
 | `binary_size_tensor_probe` | release | 63 KiB | 49,659 | 1,400 | 200 | 51,259 |
-| `tenspec_tensor_arithmetic_test` | release | 83 KiB | 72,948 | 1,672 | 200 | 74,820 |
-| `binary_size_libtorch_probe` | debug | 2.0 MiB | 117,418 | 1,192 | 200 | 118,810 |
-| `binary_size_tensor_probe` | debug | 3.1 MiB | 140,871 | 1,240 | 200 | 142,311 |
+| `typetorch_tensor_arithmetic_test` | release | 83 KiB | 72,948 | 1,672 | 200 | 74,820 |
+| `binary_size_libtorch_probe` | debug | 3.9 MiB | 156,908 | 1,272 | 200 | 158,380 |
+| `binary_size_tensor_probe` | debug | 6.2 MiB | 210,713 | 1,320 | 200 | 212,233 |
 
-Compared to the native LibTorch probe, the typed Tenspec probe is 4,120 file
+Compared to the native LibTorch probe, the typed Typetorch probe is 4,120 file
 bytes and 1,265 `.text` bytes larger in release mode, or about +6.9% file size
 and +2.6% `.text`.
 

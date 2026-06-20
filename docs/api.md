@@ -1,16 +1,16 @@
 # API Notes
 
-Tenspec wraps `at::Tensor` in a move-only type carrying a static tensor contract:
+Typetorch wraps `at::Tensor` in a move-only type carrying a static tensor contract:
 
 ```cpp
-tenspec::Tensor<Shape, DType, Device, Layout>
+typetorch::Tensor<Shape, DType, Device, Layout>
 ```
 
 ## Contract Parameters
 
 | Parameter | Meaning |
 | --- | --- |
-| `Shape<...>` | Static dimensions. Use `tenspec::dyn` for dimensions known only at runtime. |
+| `Shape<...>` | Static dimensions. Use `typetorch::dyn` for dimensions known only at runtime. |
 | `DType` | `Any`, `F32`, `F16`, `BF16`, `I64`, or `Bool`. |
 | `Device` | `Any`, `CPU`, or `CUDA`. |
 | `Layout` | `Any`, `Contiguous`, or `NonContiguous`. |
@@ -66,7 +66,7 @@ auto out = Matrix::where(condition, x, y);
 
 ## Shape and Layout Propagation
 
-Tenspec computes result types at compile time where possible:
+Typetorch computes result types at compile time where possible:
 
 - broadcast operations check static compatibility and produce a broadcast result
   shape;
@@ -83,7 +83,7 @@ of a contiguous tensor, the result type should keep that information.
 
 ## Differences From LibTorch
 
-| Area | LibTorch behavior | Tenspec behavior |
+| Area | LibTorch behavior | Typetorch behavior |
 | --- | --- | --- |
 | Invalid static shapes | Error appears when the operation runs | Static mismatch can fail at compile time. |
 | Runtime dimensions | All dimensions are runtime metadata | Known dimensions live in the type; `dyn` is explicit. |

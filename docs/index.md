@@ -1,4 +1,4 @@
-# Tenspec Documentation
+# Typetorch Documentation
 
 - [API Notes](api.md): public typed tensor API and differences from LibTorch.
 - [Design Notes](design.md): architecture and non-goals.

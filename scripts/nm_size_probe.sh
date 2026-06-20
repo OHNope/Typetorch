@@ -28,48 +28,48 @@ size "$native_probe" "$typed_probe" || true
 echo
 echo "-- native project symbols --"
 nm -S --size-sort --demangle "$native_probe" 2>/dev/null |
-  sed -n '/tenspec_binary_size_libtorch_probe/p' |
+  sed -n '/typetorch_binary_size_libtorch_probe/p' |
   tail -n "$max_lines"
 
 echo
-echo "-- tenspec project symbols --"
+echo "-- typetorch project symbols --"
 nm -S --size-sort --demangle "$typed_probe" 2>/dev/null |
-  sed -n '/tenspec/p' |
+  sed -n '/typetorch/p' |
   tail -n "$max_lines"
 
 echo
 echo "-- symbol summary --"
 native_symbol_count="$(
   nm -S --size-sort --demangle "$native_probe" 2>/dev/null |
-    awk '/tenspec_binary_size_libtorch_probe/ { count += 1 } END { print count + 0 }'
+    awk '/typetorch_binary_size_libtorch_probe/ { count += 1 } END { print count + 0 }'
 )"
 native_symbol_bytes="$(
   nm -S --size-sort --demangle "$native_probe" 2>/dev/null |
-    awk '/tenspec_binary_size_libtorch_probe/ { bytes += strtonum("0x" $2) } END { print bytes + 0 }'
+    awk '/typetorch_binary_size_libtorch_probe/ { bytes += strtonum("0x" $2) } END { print bytes + 0 }'
 )"
 typed_probe_symbol_count="$(
   nm -S --size-sort --demangle "$typed_probe" 2>/dev/null |
-    awk '/tenspec_binary_size_tensor_probe/ { count += 1 } END { print count + 0 }'
+    awk '/typetorch_binary_size_tensor_probe/ { count += 1 } END { print count + 0 }'
 )"
 typed_probe_symbol_bytes="$(
   nm -S --size-sort --demangle "$typed_probe" 2>/dev/null |
-    awk '/tenspec_binary_size_tensor_probe/ { bytes += strtonum("0x" $2) } END { print bytes + 0 }'
+    awk '/typetorch_binary_size_tensor_probe/ { bytes += strtonum("0x" $2) } END { print bytes + 0 }'
 )"
 tensor_symbol_count="$(
   nm -S --size-sort --demangle "$typed_probe" 2>/dev/null |
-    awk '! /tenspec_binary_size_tensor_probe/ && /tenspecW7tenspec6Tensor|tenspec10TensorBase/ { count += 1 } END { print count + 0 }'
+    awk '! /typetorch_binary_size_tensor_probe/ && /typetorchW9typetorch6Tensor/ { count += 1 } END { print count + 0 }'
 )"
 tensor_symbol_bytes="$(
   nm -S --size-sort --demangle "$typed_probe" 2>/dev/null |
-    awk '! /tenspec_binary_size_tensor_probe/ && /tenspecW7tenspec6Tensor|tenspec10TensorBase/ { bytes += strtonum("0x" $2) } END { print bytes + 0 }'
+    awk '! /typetorch_binary_size_tensor_probe/ && /typetorchW9typetorch6Tensor/ { bytes += strtonum("0x" $2) } END { print bytes + 0 }'
 )"
 tensor_unique_symbol_count="$(
   nm -S --size-sort --demangle "$typed_probe" 2>/dev/null |
-    awk '! /tenspec_binary_size_tensor_probe/ && /tenspecW7tenspec6Tensor|tenspec10TensorBase/ && !seen[$1]++ { count += 1 } END { print count + 0 }'
+    awk '! /typetorch_binary_size_tensor_probe/ && /typetorchW9typetorch6Tensor/ && !seen[$1]++ { count += 1 } END { print count + 0 }'
 )"
 tensor_unique_symbol_bytes="$(
   nm -S --size-sort --demangle "$typed_probe" 2>/dev/null |
-    awk '! /tenspec_binary_size_tensor_probe/ && /tenspecW7tenspec6Tensor|tenspec10TensorBase/ && !seen[$1]++ { bytes += strtonum("0x" $2) } END { print bytes + 0 }'
+    awk '! /typetorch_binary_size_tensor_probe/ && /typetorchW9typetorch6Tensor/ && !seen[$1]++ { bytes += strtonum("0x" $2) } END { print bytes + 0 }'
 )"
 runtime_check_count="$(
   nm -S --size-sort --demangle "$typed_probe" 2>/dev/null |

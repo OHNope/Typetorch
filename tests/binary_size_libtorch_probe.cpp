@@ -3,69 +3,69 @@ import libtorch;
 import fastio;
 
 #if defined(__GNUC__) || defined(__clang__)
-#define TENSPEC_SIZE_NOINLINE __attribute__((noinline, used))
+#define TYPETORCH_SIZE_NOINLINE __attribute__((noinline, used))
 #else
-#define TENSPEC_SIZE_NOINLINE
+#define TYPETORCH_SIZE_NOINLINE
 #endif
 
-namespace tenspec_binary_size_libtorch_probe
+namespace typetorch_binary_size_libtorch_probe
 {
 
-TENSPEC_SIZE_NOINLINE auto raw_identity(::at::Tensor const &x) -> ::at::Tensor
+TYPETORCH_SIZE_NOINLINE auto raw_identity(::at::Tensor const &x) -> ::at::Tensor
 {
 	return x;
 }
 
-TENSPEC_SIZE_NOINLINE auto raw_add(::at::Tensor const &a, ::at::Tensor const &b)
+TYPETORCH_SIZE_NOINLINE auto raw_add(::at::Tensor const &a, ::at::Tensor const &b)
 	-> ::at::Tensor
 {
 	return a.add(b);
 }
 
-TENSPEC_SIZE_NOINLINE auto raw_numel(::at::Tensor const &x) -> ::std::int64_t
+TYPETORCH_SIZE_NOINLINE auto raw_numel(::at::Tensor const &x) -> ::std::int64_t
 {
 	return x.numel();
 }
 
-TENSPEC_SIZE_NOINLINE auto native_raw_ref(::at::Tensor const &x)
+TYPETORCH_SIZE_NOINLINE auto native_raw_ref(::at::Tensor const &x)
 	-> ::at::Tensor const &
 {
 	return x;
 }
 
-TENSPEC_SIZE_NOINLINE auto native_retain_checked(::at::Tensor const &x)
+TYPETORCH_SIZE_NOINLINE auto native_retain_checked(::at::Tensor const &x)
 	-> ::at::Tensor
 {
 	return x;
 }
 
-TENSPEC_SIZE_NOINLINE auto native_retain_unsafe(::at::Tensor const &x)
+TYPETORCH_SIZE_NOINLINE auto native_retain_unsafe(::at::Tensor const &x)
 	-> ::at::Tensor
 {
 	return x;
 }
 
-TENSPEC_SIZE_NOINLINE auto native_unwrap(::at::Tensor x) -> ::at::Tensor
+TYPETORCH_SIZE_NOINLINE auto native_unwrap(::at::Tensor x) -> ::at::Tensor
 {
 	return x;
 }
 
-TENSPEC_SIZE_NOINLINE auto native_add(::at::Tensor const &a,
+TYPETORCH_SIZE_NOINLINE auto native_add(::at::Tensor const &a,
 									  ::at::Tensor const &b) -> ::at::Tensor
 {
 	return a.add(b);
 }
 
-TENSPEC_SIZE_NOINLINE auto native_numel(::at::Tensor const &x) -> ::std::int64_t
+TYPETORCH_SIZE_NOINLINE auto native_numel(::at::Tensor const &x) -> ::std::int64_t
 {
 	return x.numel();
 }
 
-} // namespace tenspec_binary_size_libtorch_probe
+} // namespace typetorch_binary_size_libtorch_probe
 
 int main()
 {
-	namespace probe = tenspec_binary_size_libtorch_probe;
+	namespace probe = typetorch_binary_size_libtorch_probe;
 
 	auto options{::at::TensorOptions().dtype(::at::kFloat).device(::at::kCPU)};
 	auto a{::at::ones({4}, options)};

@@ -1,4 +1,4 @@
-set_project("tenspec")
+set_project("typetorch")
 set_version("0.1.0")
 set_languages("c++26")
 set_policy("build.c++.modules.gcc.cxx11abi", true)
@@ -10,30 +10,30 @@ add_cxxflags("-isystem/usr/include/python3.9", {force = true})
 
 add_requires("libtorch-bin 2.8.0+cu128", {alias = "libtorch"})
 
-local tenspec_module_files = {
+local typetorch_module_files = {
     "src/libtorch.mpp",
-    "src/tenspec_types.mpp",
-    "src/tenspec_aten_mappings.mpp",
-    "src/tenspec_shape_meta.mpp",
-    "src/tenspec_common.mpp",
-    "src/tenspec_runtime_checks.mpp",
-    "src/tenspec_tensor.mpp",
-    "src/tenspec.mpp"
+    "src/typetorch_types.mpp",
+    "src/typetorch_aten_mappings.mpp",
+    "src/typetorch_shape_meta.mpp",
+    "src/typetorch_common.mpp",
+    "src/typetorch_runtime_checks.mpp",
+    "src/typetorch_tensor.mpp",
+    "src/typetorch.mpp"
 }
 
-local tenspec_examples_module_files = {
-    "src/tenspec_examples.mpp",
+local typetorch_examples_module_files = {
+    "src/typetorch_examples.mpp",
     "src/examples.cpp",
 }
 
-local function add_tenspec_modules()
-    for _, file in ipairs(tenspec_module_files) do
+local function add_typetorch_modules()
+    for _, file in ipairs(typetorch_module_files) do
         add_files(file)
     end
 end
 
-local function add_tenspec_examples_modules()
-    for _, file in ipairs(tenspec_examples_module_files) do
+local function add_typetorch_examples_modules()
+    for _, file in ipairs(typetorch_examples_module_files) do
         add_files(file)
     end
 end
@@ -100,7 +100,7 @@ rule("libtorch_runtime")
     on_load(function (target)
         local torch = target:pkg("libtorch")
         local torchdir = torch:installdir()
-        target:add("defines", format("TENSPEC_LIBTORCH_ROOT=\"%s\"", torch:installdir()))
+        target:add("defines", format("TYPETORCH_LIBTORCH_ROOT=\"%s\"", torch:installdir()))
         target:add("sysincludedirs", path.join(torchdir, "include"))
         target:add("sysincludedirs", path.join(torchdir, "include", "torch", "csrc", "api", "include"))
         target:add("linkdirs", path.join(torchdir, "lib"))
@@ -124,17 +124,17 @@ rule("python_headers")
     end)
 rule_end()
 
-target("tenspec_cpp_debug")
+target("typetorch_cpp_debug")
     set_kind("binary")
     add_rules("libtorch_runtime", "python_headers")
     add_packages("libtorch")
     add_files("src/fastio.mpp", "src/fastio.cpp", "examples/cpp_debug.cpp")
-    add_tenspec_modules()
-    add_tenspec_examples_modules()
+    add_typetorch_modules()
+    add_typetorch_examples_modules()
     add_includedirs("third_party/fast_io/include")
     if is_mode("debug") then
         add_cxxflags("-O0", "-g3", "-fno-inline", "-fno-omit-frame-pointer")
-        add_defines("TENSPEC_DEBUG")
+        add_defines("TYPETORCH_DEBUG")
         if get_config("sanitizers") then
             add_cxxflags("-fsanitize=address,undefined")
             add_ldflags("-fsanitize=address,undefined")
@@ -142,25 +142,25 @@ target("tenspec_cpp_debug")
     elseif is_mode("release") then
         add_cxxflags("-O3", "-march=native", "-flto")
         add_ldflags("-flto")
-        add_defines("TENSPEC_RELEASE")
+        add_defines("TYPETORCH_RELEASE")
     end
 target_end()
 
-target("tenspec_forwarding_benchmark")
+target("typetorch_forwarding_benchmark")
     set_default(false)
     set_kind("binary")
     add_rules("libtorch_runtime", "python_headers")
     add_packages("libtorch")
     add_files("src/fastio.mpp", "src/fastio.cpp", "benchmarks/forwarding_benchmark.cpp")
-    add_tenspec_modules()
+    add_typetorch_modules()
     add_includedirs("third_party/fast_io/include")
     if is_mode("debug") then
         add_cxxflags("-O0", "-g3", "-fno-inline", "-fno-omit-frame-pointer")
-        add_defines("TENSPEC_DEBUG")
+        add_defines("TYPETORCH_DEBUG")
     elseif is_mode("release") then
         add_cxxflags("-O3", "-march=native", "-flto")
         add_ldflags("-flto")
-        add_defines("TENSPEC_RELEASE")
+        add_defines("TYPETORCH_RELEASE")
     end
 target_end()
 
@@ -170,7 +170,7 @@ target("binary_size_tensor_probe")
     add_rules("libtorch_runtime", "python_headers")
     add_packages("libtorch")
     add_files("src/fastio.mpp", "src/fastio.cpp", "tests/binary_size_tensor_probe.cpp")
-    add_tenspec_modules()
+    add_typetorch_modules()
     add_includedirs("third_party/fast_io/include")
     if is_mode("debug") then
         add_cxxflags("-O0", "-g3", "-fno-inline", "-fno-omit-frame-pointer")
@@ -194,13 +194,13 @@ target("binary_size_libtorch_probe")
     end
 target_end()
 
-target("tenspec_tensor_arithmetic_test")
+target("typetorch_tensor_arithmetic_test")
     set_default(false)
     set_kind("binary")
     add_rules("libtorch_runtime", "python_headers")
     add_packages("libtorch")
     add_files("src/fastio.mpp", "src/fastio.cpp", "tests/tensor_arithmetic_test.cpp")
-    add_tenspec_modules()
+    add_typetorch_modules()
     add_includedirs("third_party/fast_io/include")
     if is_mode("debug") then
         add_cxxflags("-O0", "-g3", "-fno-inline", "-fno-omit-frame-pointer")
@@ -216,11 +216,11 @@ target("core")
     add_links("torch_python")
     add_includedirs("third_party/fast_io/include")
     add_files("src/fastio.mpp", "src/fastio.cpp", "src/test.cpp")
-    add_tenspec_modules()
+    add_typetorch_modules()
     add_cxxflags("-fvisibility=hidden")
     if is_mode("debug") then
         add_cxxflags("-O0", "-g3", "-fno-inline", "-fno-omit-frame-pointer")
-        add_defines("TENSPEC_DEBUG")
+        add_defines("TYPETORCH_DEBUG")
         if get_config("sanitizers") then
             add_cxxflags("-fsanitize=address,undefined")
             add_ldflags("-fsanitize=address,undefined")
@@ -228,11 +228,11 @@ target("core")
     elseif is_mode("release") then
         add_cxxflags("-O3", "-march=native", "-flto")
         add_ldflags("-flto")
-        add_defines("TENSPEC_RELEASE")
+        add_defines("TYPETORCH_RELEASE")
     end
 target_end()
 
-target("tenspec_capi_ext")
+target("typetorch_capi_ext")
     set_default(false)
     set_kind("shared")
     add_rules("libtorch_runtime", "python_extension")
@@ -241,20 +241,20 @@ target("tenspec_capi_ext")
     add_files("bindings/python.mpp")
     add_files("bindings/capi_bridge.mpp")
     add_files("bindings/capi_module.cpp")
-    add_files("src/tenspec_capi_reflect.mpp")
-    add_tenspec_modules()
-    add_tenspec_examples_modules()
+    add_files("src/typetorch_capi_reflect.mpp")
+    add_typetorch_modules()
+    add_typetorch_examples_modules()
     add_includedirs(".", "third_party/fast_io/include")
     add_cxxflags("-fvisibility=hidden")
     if is_mode("debug") then
         add_cxxflags("-O0", "-g3", "-fno-inline", "-fno-omit-frame-pointer")
-        add_defines("TENSPEC_DEBUG")
+        add_defines("TYPETORCH_DEBUG")
     elseif is_mode("release") then
         add_cxxflags("-fno-unwind-tables", "-fno-asynchronous-unwind-tables")
         add_cxxflags("-O3", "-march=native", "-flto")
         add_ldflags("-flto")
-        add_defines("TENSPEC_RELEASE")
+        add_defines("TYPETORCH_RELEASE")
     end
     set_prefixname("")
-    set_basename("tenspec_capi")
+    set_basename("typetorch_capi")
 target_end()

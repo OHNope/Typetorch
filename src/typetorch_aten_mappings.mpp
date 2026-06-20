@@ -1,10 +1,10 @@
-export module tenspec:aten_mappings;
+export module typetorch:aten_mappings;
 
 import std;
 import libtorch;
 export import :types;
 
-export namespace tenspec
+export namespace typetorch
 {
 
 namespace detail
@@ -28,4 +28,4 @@ consteval inline auto to_aten_device(Device device) noexcept -> c10::DeviceType
 
 } // namespace detail
 
-} // namespace tenspec
+} // namespace typetorch

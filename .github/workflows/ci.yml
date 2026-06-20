@@ -52,12 +52,12 @@ jobs:
       - name: Build tensor arithmetic test
         run: |
           source scripts/env.sh
-          xmake build tenspec_tensor_arithmetic_test
+          xmake build typetorch_tensor_arithmetic_test
 
       - name: Run tensor arithmetic test
         run: |
           source scripts/env.sh
-          xmake run tenspec_tensor_arithmetic_test
+          xmake run typetorch_tensor_arithmetic_test
 
       - name: Configure release build
         run: |

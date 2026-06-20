@@ -1,6 +1,6 @@
 import std;
 import libtorch;
-import tenspec;
+import typetorch;
 import fastio;
 
 namespace
@@ -8,21 +8,21 @@ namespace
 using Clock = ::std::chrono::steady_clock;
 using Ns = ::std::chrono::nanoseconds;
 
-using Matrix = tenspec::Tensor<tenspec::Shape<tenspec::dyn, tenspec::dyn>,
-							   tenspec::DType::F32, tenspec::Device::CPU,
-							   tenspec::Layout::Any>;
-using StaticMatrix = tenspec::Tensor<tenspec::Shape<64, 64>, tenspec::DType::F32,
-									 tenspec::Device::CPU,
-									 tenspec::Layout::Contiguous>;
-using StaticCube = tenspec::Tensor<tenspec::Shape<16, 32, 8>, tenspec::DType::F32,
-								   tenspec::Device::CPU,
-								   tenspec::Layout::Contiguous>;
+using Matrix = typetorch::Tensor<typetorch::Shape<typetorch::dyn, typetorch::dyn>,
+							   typetorch::DType::F32, typetorch::Device::CPU,
+							   typetorch::Layout::Any>;
+using StaticMatrix = typetorch::Tensor<typetorch::Shape<64, 64>, typetorch::DType::F32,
+									 typetorch::Device::CPU,
+									 typetorch::Layout::Contiguous>;
+using StaticCube = typetorch::Tensor<typetorch::Shape<16, 32, 8>, typetorch::DType::F32,
+								   typetorch::Device::CPU,
+								   typetorch::Layout::Contiguous>;
 
 struct Sample
 {
 	char const *name;
 	double raw_ns;
-	double tenspec_ns;
+	double typetorch_ns;
 };
 
 [[nodiscard]] auto read_iterations(int argc, char **argv) -> ::std::int64_t
@@ -70,23 +70,23 @@ template <class Fn>
 	return elapsed_ns(begin, end) / static_cast<double>(iterations);
 }
 
-template <class RawFn, class TenspecFn>
+template <class RawFn, class TypetorchFn>
 [[nodiscard]] auto benchmark(char const *name, ::std::int64_t iterations,
-							 RawFn &&raw_fn, TenspecFn &&tenspec_fn) -> Sample
+							 RawFn &&raw_fn, TypetorchFn &&typetorch_fn) -> Sample
 {
 	constexpr ::std::int64_t warmup{128};
 	static_cast<void>(run_loop(warmup, raw_fn));
-	static_cast<void>(run_loop(warmup, tenspec_fn));
+	static_cast<void>(run_loop(warmup, typetorch_fn));
 
 	return Sample{name, run_loop(iterations, raw_fn),
-				  run_loop(iterations, tenspec_fn)};
+				  run_loop(iterations, typetorch_fn)};
 }
 
 void print_sample(Sample const &sample)
 {
-	auto const ratio{sample.tenspec_ns / sample.raw_ns};
+	auto const ratio{sample.typetorch_ns / sample.raw_ns};
 	::fast_io::io::println(::std::string_view{sample.name}, ", raw_ns=",
-						   sample.raw_ns, ", tenspec_ns=", sample.tenspec_ns,
+						   sample.raw_ns, ", typetorch_ns=", sample.typetorch_ns,
 						   ", ratio=", ratio);
 }
 
@@ -134,7 +134,7 @@ int main(int argc, char **argv)
 
 	::fast_io::io::println("iterations=", iterations,
 						   ", threads=", ::at::get_num_threads());
-	::fast_io::io::println("ratio = tenspec / raw ::at::Tensor; near 1.0 means no measurable forwarding overhead");
+	::fast_io::io::println("ratio = typetorch / raw ::at::Tensor; near 1.0 means no measurable forwarding overhead");
 	for (auto const &sample : samples)
 	{
 		print_sample(sample);

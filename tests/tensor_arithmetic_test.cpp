@@ -1,33 +1,33 @@
 import std;
 import libtorch;
-import tenspec;
+import typetorch;
 import fastio;
 
 namespace
 {
 
-using Matrix = tenspec::Tensor<tenspec::Shape<2, 3>, tenspec::DType::F32,
-							   tenspec::Device::CPU, tenspec::Layout::Contiguous>;
-using MatrixAny = tenspec::Tensor<tenspec::Shape<2, 3>, tenspec::DType::F32,
-								  tenspec::Device::CPU, tenspec::Layout::Any>;
-using Bias = tenspec::Tensor<tenspec::Shape<3>, tenspec::DType::F32,
-							 tenspec::Device::CPU, tenspec::Layout::Contiguous>;
-using NormWeight = tenspec::Tensor<tenspec::Shape<3>, tenspec::DType::F32,
-								   tenspec::Device::CPU, tenspec::Layout::Contiguous>;
-using NormBias = tenspec::Tensor<tenspec::Shape<3>, tenspec::DType::F32,
-								 tenspec::Device::CPU, tenspec::Layout::Contiguous>;
-using Column = tenspec::Tensor<tenspec::Shape<2, 1>, tenspec::DType::F32,
-							   tenspec::Device::CPU, tenspec::Layout::Contiguous>;
-using MatrixFlat = tenspec::Tensor<tenspec::Shape<6>, tenspec::DType::F32,
-							   tenspec::Device::CPU, tenspec::Layout::Contiguous>;
-using MatrixUnsqueezed = tenspec::Tensor<tenspec::Shape<1, 2, 3>, tenspec::DType::F32,
-								 tenspec::Device::CPU, tenspec::Layout::Contiguous>;
-using Squeezable = tenspec::Tensor<tenspec::Shape<1, 2, 1, 3>, tenspec::DType::F32,
-								  tenspec::Device::CPU, tenspec::Layout::Contiguous>;
-using Squeezed = tenspec::Tensor<tenspec::Shape<2, 3>, tenspec::DType::F32,
-								 tenspec::Device::CPU, tenspec::Layout::Contiguous>;
-using BoolMatrix = tenspec::Tensor<tenspec::Shape<2, 3>, tenspec::DType::Bool,
-								  tenspec::Device::CPU, tenspec::Layout::Contiguous>;
+using Matrix = typetorch::Tensor<typetorch::Shape<2, 3>, typetorch::DType::F32,
+							   typetorch::Device::CPU, typetorch::Layout::Contiguous>;
+using MatrixAny = typetorch::Tensor<typetorch::Shape<2, 3>, typetorch::DType::F32,
+								  typetorch::Device::CPU, typetorch::Layout::Any>;
+using Bias = typetorch::Tensor<typetorch::Shape<3>, typetorch::DType::F32,
+							 typetorch::Device::CPU, typetorch::Layout::Contiguous>;
+using NormWeight = typetorch::Tensor<typetorch::Shape<3>, typetorch::DType::F32,
+								   typetorch::Device::CPU, typetorch::Layout::Contiguous>;
+using NormBias = typetorch::Tensor<typetorch::Shape<3>, typetorch::DType::F32,
+								 typetorch::Device::CPU, typetorch::Layout::Contiguous>;
+using Column = typetorch::Tensor<typetorch::Shape<2, 1>, typetorch::DType::F32,
+							   typetorch::Device::CPU, typetorch::Layout::Contiguous>;
+using MatrixFlat = typetorch::Tensor<typetorch::Shape<6>, typetorch::DType::F32,
+							   typetorch::Device::CPU, typetorch::Layout::Contiguous>;
+using MatrixUnsqueezed = typetorch::Tensor<typetorch::Shape<1, 2, 3>, typetorch::DType::F32,
+								 typetorch::Device::CPU, typetorch::Layout::Contiguous>;
+using Squeezable = typetorch::Tensor<typetorch::Shape<1, 2, 1, 3>, typetorch::DType::F32,
+								  typetorch::Device::CPU, typetorch::Layout::Contiguous>;
+using Squeezed = typetorch::Tensor<typetorch::Shape<2, 3>, typetorch::DType::F32,
+								 typetorch::Device::CPU, typetorch::Layout::Contiguous>;
+using BoolMatrix = typetorch::Tensor<typetorch::Shape<2, 3>, typetorch::DType::Bool,
+								  typetorch::Device::CPU, typetorch::Layout::Contiguous>;
 
 static_assert(::std::same_as<
 			  decltype(::std::declval<Matrix const &>().sub(
@@ -215,5 +215,5 @@ int main()
 			.unsafe_raw(),
 		::at::where(mask_raw, matrix_raw(), twos_raw));
 
-	::fast_io::io::println("tenspec tensor arithmetic tests passed");
+	::fast_io::io::println("typetorch tensor arithmetic tests passed");
 }

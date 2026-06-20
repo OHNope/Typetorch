@@ -1,10 +1,10 @@
-export module tenspec:runtime_checks;
+export module typetorch:runtime_checks;
 
 import std;
 import libtorch;
 export import :types;
 
-export namespace tenspec
+export namespace typetorch
 {
 
 namespace detail
@@ -108,4 +108,4 @@ check_tensor_compatible_runtime(::at::Tensor const &raw,
 
 } // namespace detail
 
-} // namespace tenspec
+} // namespace typetorch

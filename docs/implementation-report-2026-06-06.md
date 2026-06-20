@@ -4,13 +4,13 @@ This note summarizes the current modules-based implementation state.
 
 ## Current Shape
 
-- Core tensor contracts live in `src/tenspec_types.mpp`,
-  `src/tenspec_shape_meta.mpp`, and `src/tenspec_tensor.mpp`.
+- Core tensor contracts live in `src/typetorch_types.mpp`,
+  `src/typetorch_shape_meta.mpp`, and `src/typetorch_tensor.mpp`.
 - Runtime compatibility checks are separated into
-  `src/tenspec_runtime_checks.mpp`.
+  `src/typetorch_runtime_checks.mpp`.
 - `src/libtorch.mpp` exports the small LibTorch surface used by the wrapper.
 - Python C API integration is split across `bindings/` and
-  `src/tenspec_capi_reflect.mpp`.
+  `src/typetorch_capi_reflect.mpp`.
 - Public API notes live in `docs/api.md`.
 - Measurement methodology lives in `docs/performance-and-size.md`.
 

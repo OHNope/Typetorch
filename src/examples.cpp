@@ -1,38 +1,38 @@
-module tenspec.examples;
+module typetorch.examples;
 
 import std;
 import libtorch;
-import tenspec;
+import typetorch;
 
-namespace tenspec_examples
+namespace typetorch_examples
 {
 namespace detail
 {
 
-using Weight3To2 = tenspec::Tensor<tenspec::Shape<3, 2>, tenspec::DType::F32,
-								   tenspec::Device::CPU,
-								   tenspec::Layout::Any>;
-using StaticVector = tenspec::Tensor<tenspec::Shape<6>, tenspec::DType::F32,
-									 tenspec::Device::CPU,
-									 tenspec::Layout::Contiguous>;
-using StaticMatrix = tenspec::Tensor<tenspec::Shape<2, 3>, tenspec::DType::F32,
-									 tenspec::Device::CPU,
-									 tenspec::Layout::Contiguous>;
-using StaticMatrixT = tenspec::Tensor<tenspec::Shape<3, 2>, tenspec::DType::F32,
-									  tenspec::Device::CPU,
-									  tenspec::Layout::Any>;
-using StaticCube = tenspec::Tensor<tenspec::Shape<2, 3, 4>, tenspec::DType::F32,
-								   tenspec::Device::CPU,
-								   tenspec::Layout::Contiguous>;
+using Weight3To2 = typetorch::Tensor<typetorch::Shape<3, 2>, typetorch::DType::F32,
+								   typetorch::Device::CPU,
+								   typetorch::Layout::Any>;
+using StaticVector = typetorch::Tensor<typetorch::Shape<6>, typetorch::DType::F32,
+									 typetorch::Device::CPU,
+									 typetorch::Layout::Contiguous>;
+using StaticMatrix = typetorch::Tensor<typetorch::Shape<2, 3>, typetorch::DType::F32,
+									 typetorch::Device::CPU,
+									 typetorch::Layout::Contiguous>;
+using StaticMatrixT = typetorch::Tensor<typetorch::Shape<3, 2>, typetorch::DType::F32,
+									  typetorch::Device::CPU,
+									  typetorch::Layout::Any>;
+using StaticCube = typetorch::Tensor<typetorch::Shape<2, 3, 4>, typetorch::DType::F32,
+								   typetorch::Device::CPU,
+								   typetorch::Layout::Contiguous>;
 using StaticCubePermuted =
-	tenspec::Tensor<tenspec::Shape<2, 4, 3>, tenspec::DType::F32,
-					tenspec::Device::CPU, tenspec::Layout::Any>;
+	typetorch::Tensor<typetorch::Shape<2, 4, 3>, typetorch::DType::F32,
+					typetorch::Device::CPU, typetorch::Layout::Any>;
 using StaticCubePermutedContiguous =
-	tenspec::Tensor<tenspec::Shape<2, 4, 3>, tenspec::DType::F32,
-					tenspec::Device::CPU, tenspec::Layout::Contiguous>;
+	typetorch::Tensor<typetorch::Shape<2, 4, 3>, typetorch::DType::F32,
+					typetorch::Device::CPU, typetorch::Layout::Contiguous>;
 using StaticCubeIdentity =
-	tenspec::Tensor<tenspec::Shape<2, 3, 4>, tenspec::DType::F32,
-					tenspec::Device::CPU, tenspec::Layout::Contiguous>;
+	typetorch::Tensor<typetorch::Shape<2, 3, 4>, typetorch::DType::F32,
+					typetorch::Device::CPU, typetorch::Layout::Contiguous>;
 
 static_assert(::std::is_same_v<decltype(Vector::retain(
 								   ::std::declval<::at::Tensor const &>())),
@@ -78,7 +78,7 @@ static_assert(::std::is_same_v<decltype(::std::declval<StaticCube &&>()
 											.permute<0, 1, 2>()),
 							   StaticCubeIdentity>);
 static_assert(::std::is_same_v<decltype(::std::declval<StaticMatrix &&>()
-											.view<tenspec::infer>()),
+											.view<typetorch::infer>()),
 							   StaticVector>);
 static_assert(::std::is_same_v<decltype(::std::declval<StaticCubePermuted &&>()
 											.contiguous()),
@@ -92,10 +92,10 @@ static_assert(::std::is_same_v<decltype(StaticMatrix::arange<6>()), StaticVector
 static_assert(::std::is_same_v<decltype(StaticMatrix::arange<0, 6>()),
 							   StaticVector>);
 static_assert(::std::is_same_v<
-			  decltype(StaticMatrix::arange<0, 6, 2, tenspec::DType::I64>()),
-			  tenspec::Tensor<tenspec::Shape<3>, tenspec::DType::I64,
-							  tenspec::Device::CPU,
-							  tenspec::Layout::Contiguous>>);
+			  decltype(StaticMatrix::arange<0, 6, 2, typetorch::DType::I64>()),
+			  typetorch::Tensor<typetorch::Shape<3>, typetorch::DType::I64,
+							  typetorch::Device::CPU,
+							  typetorch::Layout::Contiguous>>);
 
 ::at::Tensor fixed_linear_weight();
 
@@ -151,4 +151,4 @@ namespace detail
 
 } // namespace detail
 
-} // namespace tenspec_examples
+} // namespace typetorch_examples

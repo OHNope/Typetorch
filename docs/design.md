@@ -1,7 +1,7 @@
 # Design Notes
 
-tenspec is built around one rule: LibTorch stays responsible for tensor
-storage, kernels, dispatch, autograd, and device behavior. tenspec adds a typed
+typetorch is built around one rule: LibTorch stays responsible for tensor
+storage, kernels, dispatch, autograd, and device behavior. typetorch adds a typed
 contract layer around `::at::Tensor` and tries to make the contract cheap enough
 that users can keep it in ordinary C++ code.
 
@@ -10,7 +10,7 @@ that users can keep it in ordinary C++ code.
 The central type is:
 
 ```cpp
-tenspec::Tensor<Shape, DType, Device, Layout>
+typetorch::Tensor<Shape, DType, Device, Layout>
 ```
 
 The type parameters describe the contract:
@@ -81,10 +81,10 @@ does not use C++ exceptions for Python argument conversion.
 
 The codebase uses C++26 modules to keep heavy dependencies controlled:
 
-- Core tenspec modules live in `src/tenspec_*.mpp`.
+- Core typetorch modules live in `src/typetorch_*.mpp`.
 - `src/libtorch.mpp` wraps LibTorch imports.
 - `bindings/python.mpp` wraps `Python.h` and torch Python C API headers.
-- `src/tenspec_capi_reflect.mpp` imports both the typed tensor modules and the
+- `src/typetorch_capi_reflect.mpp` imports both the typed tensor modules and the
   Python module to generate wrappers.
 
 This organization avoids mixing Python C headers and module imports in ordinary
@@ -96,7 +96,7 @@ The extension is built with hidden symbol visibility. The only symbol that must
 be visible to Python's dynamic loader is:
 
 ```cpp
-PyInit_tenspec_capi
+PyInit_typetorch_capi
 ```
 
 Generated wrappers, reflection helpers, and local tensor wrapper symbols should
@@ -104,7 +104,7 @@ remain internal to the shared object.
 
 ## Non-Goals
 
-tenspec is not trying to:
+typetorch is not trying to:
 
 - replace PyTorch dispatch or kernels;
 - provide a stable public C ABI;

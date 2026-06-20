@@ -1,13 +1,13 @@
-export module tenspec.capi_reflect;
+export module typetorch.capi_reflect;
 
 import std;
 import libtorch;
 import python;
-import tenspec;
-import tenspec.capi_bridge;
-import tenspec.examples;
+import typetorch;
+import typetorch.capi_bridge;
+import typetorch.examples;
 
-namespace tenspec_capi::reflect
+namespace typetorch_capi::reflect
 {
 
 template <typename T>
@@ -26,7 +26,7 @@ template <typename Arg>
 inline auto parse_arg(python::PyObject *object, ::std::size_t index)
 	-> ::std::optional<parsed_arg_t<Arg>>
 {
-	if constexpr (tenspec::TensorLike<Arg>)
+	if constexpr (typetorch::TensorLike<Arg>)
 	{
 		if (!python::tensor_check(object))
 		{
@@ -199,7 +199,7 @@ template <typename Result>
 inline auto to_python(Result &&result) -> python::PyObject *
 {
 	using Bare = ::std::remove_cvref_t<Result>;
-	if constexpr (tenspec::TensorLike<Bare>)
+	if constexpr (typetorch::TensorLike<Bare>)
 	{
 		return python::THPVariable_Wrap(::std::move(result).unwrap());
 	}
@@ -298,10 +298,10 @@ inline auto invoke(python::PyObject *, python::PyObject *args) noexcept -> pytho
 }
 
 template <auto Function>
-inline void visit_function(char const *name, tenspec_python_visit_fn visit,
+inline void visit_function(char const *name, typetorch_python_visit_fn visit,
 						   void *user) noexcept
 {
-	tenspec_python_function function{
+	typetorch_python_function function{
 		.name = name,
 		.doc = nullptr,
 		.invoke = invoke<Function>,
@@ -316,9 +316,9 @@ consteval inline auto members_of_namespace(::std::meta::info Namespace) noexcept
 		::std::meta::members_of(Namespace, context));
 }
 
-} // namespace tenspec_capi::reflect
+} // namespace typetorch_capi::reflect
 
-extern "C" void tenspec_python_for_each_function(tenspec_python_visit_fn visit,
+extern "C" void typetorch_python_for_each_function(typetorch_python_visit_fn visit,
 												 void *user) noexcept
 {
 	if (!visit)
@@ -327,13 +327,13 @@ extern "C" void tenspec_python_for_each_function(tenspec_python_visit_fn visit,
 	}
 
 	static constexpr auto members{
-		::tenspec_capi::reflect::members_of_namespace(^^tenspec_examples)};
+		::typetorch_capi::reflect::members_of_namespace(^^typetorch_examples)};
 	template for (constexpr auto member : members)
 	{
 		if constexpr (::std::meta::is_function(member))
 		{
 			::std::string name{::std::meta::identifier_of(member)};
-			::tenspec_capi::reflect::visit_function<([:member:])>(name.c_str(), visit,
+			::typetorch_capi::reflect::visit_function<([:member:])>(name.c_str(), visit,
 																  user);
 		}
 	}

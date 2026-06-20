@@ -1,8 +1,8 @@
-export module tenspec:types;
+export module typetorch:types;
 
 import std;
 
-export namespace tenspec
+export namespace typetorch
 {
 
 constexpr inline ::std::int64_t infer{-1};
@@ -66,4 +66,4 @@ class Tensor;
 template <class T>
 concept TensorLike = is_template_specialization_of(^^T, ^^Tensor);
 
-} // namespace tenspec
+} // namespace typetorch

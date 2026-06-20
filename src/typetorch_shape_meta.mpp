@@ -1,9 +1,9 @@
-export module tenspec:shape_meta;
+export module typetorch:shape_meta;
 
 import std;
 export import :types;
 
-export namespace tenspec
+export namespace typetorch
 {
 
 namespace detail
@@ -529,4 +529,4 @@ consteval inline void check_contiguous_compiletime(Layout const layout)
 
 } // namespace detail
 
-} // namespace tenspec
+} // namespace typetorch

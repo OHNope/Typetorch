@@ -13,6 +13,6 @@ Diagnostics:
         - unsupported-option
 ---
 If:
-    PathMatch: (bindings/.*\.cpp|src/.*\.cpp|examples/.*\.cpp|tests/.*\.cpp|include/tenspec/.*\.hpp)
+    PathMatch: (bindings/.*\.cpp|src/.*\.cpp|examples/.*\.cpp|tests/.*\.cpp|include/typetorch/.*\.hpp)
 Diagnostics:
     Suppress: ["*"]
