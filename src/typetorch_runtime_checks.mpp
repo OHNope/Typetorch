@@ -1,5 +1,6 @@
 export module typetorch:runtime_checks;
 
+import fast_io;
 import std;
 import libtorch;
 export import :types;
@@ -9,6 +10,353 @@ export namespace typetorch
 
 namespace detail
 {
+
+[[nodiscard]] inline auto dtype_name(DType dtype) noexcept -> char const *
+{
+	switch (dtype)
+	{
+	case DType::Any:
+		return "Any";
+	case DType::F32:
+		return "F32";
+	case DType::F16:
+		return "F16";
+	case DType::BF16:
+		return "BF16";
+	case DType::I64:
+		return "I64";
+	case DType::Bool:
+		return "Bool";
+	}
+
+	return "<unknown DType>";
+}
+
+[[nodiscard]] inline auto scalar_type_name(::at::ScalarType dtype) noexcept
+	-> char const *
+{
+	switch (dtype)
+	{
+	case ::at::kFloat:
+		return "F32 / at::kFloat";
+	case ::at::kHalf:
+		return "F16 / at::kHalf";
+	case ::at::kBFloat16:
+		return "BF16 / at::kBFloat16";
+	case ::at::kLong:
+		return "I64 / at::kLong";
+	case ::at::kBool:
+		return "Bool / at::kBool";
+	case ::at::kDouble:
+		return "F64 / at::kDouble";
+	case ::at::kInt:
+		return "I32 / at::kInt";
+	case ::at::kShort:
+		return "I16 / at::kShort";
+	case ::at::kChar:
+		return "I8 / at::kChar";
+	case ::at::kByte:
+		return "U8 / at::kByte";
+	default:
+		return "<unsupported or unknown at::ScalarType>";
+	}
+}
+
+[[nodiscard]] inline auto device_name(Device device) noexcept -> char const *
+{
+	switch (device)
+	{
+	case Device::Any:
+		return "Any";
+	case Device::CPU:
+		return "CPU";
+	case Device::CUDA:
+		return "CUDA";
+	}
+
+	return "<unknown Device>";
+}
+
+[[nodiscard]] inline auto tensor_device_name(::at::Tensor const &raw) noexcept
+	-> char const *
+{
+	if (!raw.defined())
+	{
+		return "<undefined>";
+	}
+
+	if (raw.device().is_cpu())
+	{
+		return "CPU";
+	}
+
+	if (raw.is_cuda())
+	{
+		return "CUDA";
+	}
+
+	return "<other device>";
+}
+
+[[nodiscard]] inline auto layout_name(Layout layout) noexcept -> char const *
+{
+	switch (layout)
+	{
+	case Layout::Any:
+		return "Any";
+	case Layout::Contiguous:
+		return "Contiguous";
+	case Layout::NonContiguous:
+		return "NonContiguous";
+	}
+
+	return "<unknown Layout>";
+}
+
+[[nodiscard]] inline auto tensor_layout_name(::at::Tensor const &raw) noexcept
+	-> char const *
+{
+	if (!raw.defined())
+	{
+		return "<undefined>";
+	}
+
+	return raw.is_contiguous() ? "Contiguous" : "NonContiguous";
+}
+
+inline void print_shape(::std::span<::std::int64_t const> dims) noexcept
+{
+	fast_io::print("[");
+
+	for (::std::size_t i{}; i < dims.size(); ++i)
+	{
+		if (i != 0)
+		{
+			fast_io::print(", ");
+		}
+
+		if (dims[i] == dyn)
+		{
+			fast_io::print("dyn");
+		}
+		else
+		{
+			fast_io::print(dims[i]);
+		}
+	}
+
+	fast_io::print("]");
+}
+
+inline void print_tensor_shape(::at::Tensor const &raw) noexcept
+{
+	if (!raw.defined())
+	{
+		fast_io::print("<undefined>");
+		return;
+	}
+
+	fast_io::print("[");
+
+	auto const rank{raw.dim()};
+
+	for (::std::int64_t i{}; i < rank; ++i)
+	{
+		if (i != 0)
+		{
+			fast_io::print(", ");
+		}
+
+		fast_io::print(raw.size(i));
+	}
+
+	fast_io::print("]");
+}
+
+[[noreturn]] inline void contract_violation(
+	char const *where,
+	char const *message) noexcept
+{
+	fast_io::println(
+		"typetorch contract violation in ",
+		where,
+		": ",
+		message);
+
+	::std::terminate();
+}
+
+[[noreturn]] inline void undefined_tensor(
+	char const *where) noexcept
+{
+	fast_io::println(
+		"typetorch contract violation in ",
+		where,
+		": input tensor is undefined");
+
+	::std::terminate();
+}
+
+[[noreturn]] inline void rank_mismatch(
+	char const *where,
+	::std::size_t expected_rank,
+	::std::int64_t actual_rank) noexcept
+{
+	fast_io::println(
+		"typetorch contract violation in ",
+		where,
+		": rank mismatch");
+
+	fast_io::println("  expected rank: ", expected_rank);
+	fast_io::println("  actual rank:   ", actual_rank);
+
+	::std::terminate();
+}
+
+[[noreturn]] inline void shape_mismatch(
+	char const *where,
+	::std::size_t dim,
+	::std::int64_t expected_dim,
+	::std::int64_t actual_dim) noexcept
+{
+	fast_io::println(
+		"typetorch contract violation in ",
+		where,
+		": shape mismatch");
+
+	fast_io::println("  dimension: ", dim);
+
+	if (expected_dim == dyn)
+	{
+		fast_io::println("  expected:  dyn");
+	}
+	else
+	{
+		fast_io::println("  expected:  ", expected_dim);
+	}
+
+	fast_io::println("  actual:    ", actual_dim);
+
+	::std::terminate();
+}
+
+[[noreturn]] inline void dtype_mismatch(
+	char const *where,
+	DType expected,
+	::at::ScalarType actual) noexcept
+{
+	fast_io::println(
+		"typetorch contract violation in ",
+		where,
+		": dtype mismatch");
+
+	fast_io::println("  expected dtype: ", dtype_name(expected));
+	fast_io::println("  actual dtype:   ", scalar_type_name(actual));
+
+	::std::terminate();
+}
+
+[[noreturn]] inline void device_mismatch(
+	char const *where,
+	Device expected,
+	::at::Tensor const &raw) noexcept
+{
+	fast_io::println(
+		"typetorch contract violation in ",
+		where,
+		": device mismatch");
+
+	fast_io::println("  expected device: ", device_name(expected));
+	fast_io::println("  actual device:   ", tensor_device_name(raw));
+
+	::std::terminate();
+}
+
+[[noreturn]] inline void layout_mismatch(
+	char const *where,
+	Layout expected,
+	::at::Tensor const &raw) noexcept
+{
+	fast_io::println(
+		"typetorch contract violation in ",
+		where,
+		": layout mismatch");
+
+	fast_io::println("  expected layout: ", layout_name(expected));
+	fast_io::println("  actual layout:   ", tensor_layout_name(raw));
+
+	::std::terminate();
+}
+
+[[noreturn]] inline void full_tensor_contract_mismatch(
+	char const *where,
+	::at::Tensor const &raw,
+	::std::span<::std::int64_t const> expected_shape,
+	DType expected_dtype,
+	Device expected_device,
+	Layout expected_layout) noexcept
+{
+	fast_io::println(
+		"typetorch contract violation in ",
+		where,
+		": tensor does not satisfy expected contract");
+
+	fast_io::print("  expected shape: ");
+	print_shape(expected_shape);
+	fast_io::println();
+
+	fast_io::print("  actual shape:   ");
+	print_tensor_shape(raw);
+	fast_io::println();
+
+	fast_io::println("  expected dtype:  ", dtype_name(expected_dtype));
+
+	if (raw.defined())
+	{
+		fast_io::println("  actual dtype:    ", scalar_type_name(raw.scalar_type()));
+	}
+	else
+	{
+		fast_io::println("  actual dtype:    <undefined>");
+	}
+
+	fast_io::println("  expected device: ", device_name(expected_device));
+	fast_io::println("  actual device:   ", tensor_device_name(raw));
+
+	fast_io::println("  expected layout: ", layout_name(expected_layout));
+	fast_io::println("  actual layout:   ", tensor_layout_name(raw));
+
+	::std::terminate();
+}
+
+[[noreturn]] inline void factory_layout_violation(
+	char const *where,
+	Layout requested_layout) noexcept
+{
+	fast_io::println(
+		"typetorch contract violation in ",
+		where,
+		": factory function cannot create requested layout");
+
+	fast_io::println("  requested layout: ", layout_name(requested_layout));
+	fast_io::println("  factory result:   Contiguous");
+
+	::std::terminate();
+}
+
+[[noreturn]] inline void non_contiguous_view_violation(
+	char const *where,
+	Layout current_layout) noexcept
+{
+	fast_io::println(
+		"typetorch contract violation in ",
+		where,
+		": view() requires a statically contiguous tensor");
+
+	fast_io::println("  current layout: ", layout_name(current_layout));
+
+	::std::terminate();
+}
 
 inline auto dtype_matches(DType expected, ::at::ScalarType actual) noexcept
 	-> bool
@@ -62,47 +410,75 @@ inline auto layout_matches(Layout expected, ::at::Tensor const &raw) noexcept
 	return false;
 }
 
-inline void
-check_shape_compatible_runtime(::at::Tensor const &raw,
-							   ::std::span<::std::int64_t const> dims)
+inline void check_shape_compatible_runtime(
+	::at::Tensor const &raw,
+	::std::span<::std::int64_t const> dims,
+	char const *where = "Tensor::retain")
 {
-	if (raw.dim() != static_cast<::std::int64_t>(dims.size()))
+	if (!raw.defined())
 	{
-		::std::terminate();
+		undefined_tensor(where);
 	}
 
-	for (::std::size_t i{0}; i < dims.size(); ++i)
+	if (raw.dim() != static_cast<::std::int64_t>(dims.size()))
+	{
+		rank_mismatch(
+			where,
+			dims.size(),
+			raw.dim());
+	}
+
+	for (::std::size_t i{}; i < dims.size(); ++i)
 	{
 		::std::int64_t const expected{dims[i]};
+
 		if (expected == dyn)
 		{
 			continue;
 		}
 
-		if (raw.size(static_cast<::std::int64_t>(i)) != static_cast<::std::int64_t>(expected))
+		::std::int64_t const actual{
+			raw.size(static_cast<::std::int64_t>(i))};
+
+		if (actual != expected)
 		{
-			::std::terminate();
+			shape_mismatch(
+				where,
+				i,
+				expected,
+				actual);
 		}
 	}
 }
 
-inline void
-check_tensor_compatible_runtime(::at::Tensor const &raw,
-								::std::span<::std::int64_t const> dims,
-								DType dtype, Device device, Layout layout)
+inline void check_tensor_compatible_runtime(
+	::at::Tensor const &raw,
+	::std::span<::std::int64_t const> dims,
+	DType dtype,
+	Device device,
+	Layout layout,
+	char const *where = "Tensor::retain")
 {
-	check_shape_compatible_runtime(raw, dims);
+	if (!raw.defined())
+	{
+		undefined_tensor(where);
+	}
+
+	check_shape_compatible_runtime(raw, dims, where);
+
 	if (!dtype_matches(dtype, raw.scalar_type()))
 	{
-		::std::terminate();
+		dtype_mismatch(where, dtype, raw.scalar_type());
 	}
+
 	if (!device_matches(device, raw))
 	{
-		::std::terminate();
+		device_mismatch(where, device, raw);
 	}
+
 	if (!layout_matches(layout, raw))
 	{
-		::std::terminate();
+		layout_mismatch(where, layout, raw);
 	}
 }
 

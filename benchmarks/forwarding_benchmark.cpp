@@ -1,7 +1,7 @@
 import std;
 import libtorch;
 import typetorch;
-import fastio;
+import fast_io;
 
 namespace
 {
@@ -9,14 +9,14 @@ using Clock = ::std::chrono::steady_clock;
 using Ns = ::std::chrono::nanoseconds;
 
 using Matrix = typetorch::Tensor<typetorch::Shape<typetorch::dyn, typetorch::dyn>,
-							   typetorch::DType::F32, typetorch::Device::CPU,
-							   typetorch::Layout::Any>;
+								 typetorch::DType::F32, typetorch::Device::CPU,
+								 typetorch::Layout::Any>;
 using StaticMatrix = typetorch::Tensor<typetorch::Shape<64, 64>, typetorch::DType::F32,
+									   typetorch::Device::CPU,
+									   typetorch::Layout::Contiguous>;
+using StaticCube = typetorch::Tensor<typetorch::Shape<16, 32, 8>, typetorch::DType::F32,
 									 typetorch::Device::CPU,
 									 typetorch::Layout::Contiguous>;
-using StaticCube = typetorch::Tensor<typetorch::Shape<16, 32, 8>, typetorch::DType::F32,
-								   typetorch::Device::CPU,
-								   typetorch::Layout::Contiguous>;
 
 struct Sample
 {

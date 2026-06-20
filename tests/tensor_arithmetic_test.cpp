@@ -1,33 +1,33 @@
 import std;
 import libtorch;
 import typetorch;
-import fastio;
+import fast_io;
 
 namespace
 {
 
 using Matrix = typetorch::Tensor<typetorch::Shape<2, 3>, typetorch::DType::F32,
-							   typetorch::Device::CPU, typetorch::Layout::Contiguous>;
+								 typetorch::Device::CPU, typetorch::Layout::Contiguous>;
 using MatrixAny = typetorch::Tensor<typetorch::Shape<2, 3>, typetorch::DType::F32,
-								  typetorch::Device::CPU, typetorch::Layout::Any>;
+									typetorch::Device::CPU, typetorch::Layout::Any>;
 using Bias = typetorch::Tensor<typetorch::Shape<3>, typetorch::DType::F32,
-							 typetorch::Device::CPU, typetorch::Layout::Contiguous>;
+							   typetorch::Device::CPU, typetorch::Layout::Contiguous>;
 using NormWeight = typetorch::Tensor<typetorch::Shape<3>, typetorch::DType::F32,
-								   typetorch::Device::CPU, typetorch::Layout::Contiguous>;
+									 typetorch::Device::CPU, typetorch::Layout::Contiguous>;
 using NormBias = typetorch::Tensor<typetorch::Shape<3>, typetorch::DType::F32,
-								 typetorch::Device::CPU, typetorch::Layout::Contiguous>;
+								   typetorch::Device::CPU, typetorch::Layout::Contiguous>;
 using Column = typetorch::Tensor<typetorch::Shape<2, 1>, typetorch::DType::F32,
-							   typetorch::Device::CPU, typetorch::Layout::Contiguous>;
+								 typetorch::Device::CPU, typetorch::Layout::Contiguous>;
 using MatrixFlat = typetorch::Tensor<typetorch::Shape<6>, typetorch::DType::F32,
-							   typetorch::Device::CPU, typetorch::Layout::Contiguous>;
+									 typetorch::Device::CPU, typetorch::Layout::Contiguous>;
 using MatrixUnsqueezed = typetorch::Tensor<typetorch::Shape<1, 2, 3>, typetorch::DType::F32,
-								 typetorch::Device::CPU, typetorch::Layout::Contiguous>;
+										   typetorch::Device::CPU, typetorch::Layout::Contiguous>;
 using Squeezable = typetorch::Tensor<typetorch::Shape<1, 2, 1, 3>, typetorch::DType::F32,
-								  typetorch::Device::CPU, typetorch::Layout::Contiguous>;
+									 typetorch::Device::CPU, typetorch::Layout::Contiguous>;
 using Squeezed = typetorch::Tensor<typetorch::Shape<2, 3>, typetorch::DType::F32,
-								 typetorch::Device::CPU, typetorch::Layout::Contiguous>;
+								   typetorch::Device::CPU, typetorch::Layout::Contiguous>;
 using BoolMatrix = typetorch::Tensor<typetorch::Shape<2, 3>, typetorch::DType::Bool,
-								  typetorch::Device::CPU, typetorch::Layout::Contiguous>;
+									 typetorch::Device::CPU, typetorch::Layout::Contiguous>;
 
 static_assert(::std::same_as<
 			  decltype(::std::declval<Matrix const &>().sub(
@@ -89,8 +89,8 @@ static_assert(::std::same_as<
 			  MatrixAny>);
 static_assert(::std::same_as<
 			  decltype(Matrix::where(::std::declval<BoolMatrix const &>(),
-							 ::std::declval<Matrix const &>(),
-							 ::std::declval<Matrix const &>())),
+									 ::std::declval<Matrix const &>(),
+									 ::std::declval<Matrix const &>())),
 			  MatrixAny>);
 
 auto options() -> ::at::TensorOptions

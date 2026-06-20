@@ -1,7 +1,7 @@
 import std;
 import libtorch;
 import typetorch;
-import fastio;
+import fast_io;
 
 #if defined(__GNUC__) || defined(__clang__)
 #define TYPETORCH_SIZE_NOINLINE __attribute__((noinline, used))
@@ -13,8 +13,8 @@ namespace typetorch_binary_size_tensor_probe
 {
 
 using Vector = typetorch::Tensor<typetorch::Shape<typetorch::dyn>,
-							   typetorch::DType::F32, typetorch::Device::CPU,
-							   typetorch::Layout::Any>;
+								 typetorch::DType::F32, typetorch::Device::CPU,
+								 typetorch::Layout::Any>;
 TYPETORCH_SIZE_NOINLINE auto raw_identity(::at::Tensor const &x) -> ::at::Tensor
 {
 	return x;

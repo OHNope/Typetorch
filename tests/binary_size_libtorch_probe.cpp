@@ -1,6 +1,6 @@
 import std;
 import libtorch;
-import fastio;
+import fast_io;
 
 #if defined(__GNUC__) || defined(__clang__)
 #define TYPETORCH_SIZE_NOINLINE __attribute__((noinline, used))
@@ -51,7 +51,7 @@ TYPETORCH_SIZE_NOINLINE auto native_unwrap(::at::Tensor x) -> ::at::Tensor
 }
 
 TYPETORCH_SIZE_NOINLINE auto native_add(::at::Tensor const &a,
-									  ::at::Tensor const &b) -> ::at::Tensor
+										::at::Tensor const &b) -> ::at::Tensor
 {
 	return a.add(b);
 }

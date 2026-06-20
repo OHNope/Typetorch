@@ -1,7 +1,7 @@
 import std;
 import libtorch;
 import typetorch.examples;
-import fastio;
+import fast_io;
 
 namespace
 {
@@ -75,13 +75,13 @@ int main()
 
 	using StaticVector =
 		typetorch::Tensor<typetorch::Shape<6>, typetorch::DType::F32,
-						typetorch::Device::CPU, typetorch::Layout::Contiguous>;
+						  typetorch::Device::CPU, typetorch::Layout::Contiguous>;
 	using StaticMatrix =
 		typetorch::Tensor<typetorch::Shape<2, 3>, typetorch::DType::F32,
-						typetorch::Device::CPU, typetorch::Layout::Contiguous>;
+						  typetorch::Device::CPU, typetorch::Layout::Contiguous>;
 	using StaticCube =
 		typetorch::Tensor<typetorch::Shape<2, 3, 4>, typetorch::DType::F32,
-						typetorch::Device::CPU, typetorch::Layout::Contiguous>;
+						  typetorch::Device::CPU, typetorch::Layout::Contiguous>;
 
 	auto options{::at::TensorOptions().dtype(::at::kFloat).device(::at::kCPU)};
 	auto matrix_raw{::at::arange(6, options).view({2, 3})};

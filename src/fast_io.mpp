@@ -1,0 +1,98 @@
+export module fast_io;
+
+export namespace fast_io
+{
+inline namespace io
+{
+using size_type = decltype(sizeof(0));
+
+void write(char const *value, size_type size);
+void write(char value);
+void write(bool value);
+void write(short value);
+void write(unsigned short value);
+void write(int value);
+void write(unsigned int value);
+void write(long value);
+void write(unsigned long value);
+void write(long long value);
+void write(unsigned long long value);
+void write(float value);
+void write(double value);
+void write(long double value);
+
+void errwrite(char const *value, size_type size);
+void errwrite(char value);
+void errwrite(bool value);
+void errwrite(short value);
+void errwrite(unsigned short value);
+void errwrite(int value);
+void errwrite(unsigned int value);
+void errwrite(long value);
+void errwrite(unsigned long value);
+void errwrite(long long value);
+void errwrite(unsigned long long value);
+void errwrite(float value);
+void errwrite(double value);
+void errwrite(long double value);
+
+template <size_type size>
+inline void write(char const (&value)[size])
+{
+	write(value, size - 1);
+}
+
+template <size_type size>
+inline void errwrite(char const (&value)[size])
+{
+	errwrite(value, size - 1);
+}
+
+template <class View>
+	requires requires(View const &value) {
+		value.data();
+		value.size();
+	}
+inline void write(View const &value)
+{
+	write(value.data(), static_cast<size_type>(value.size()));
+}
+
+template <class View>
+	requires requires(View const &value) {
+		value.data();
+		value.size();
+	}
+inline void errwrite(View const &value)
+{
+	errwrite(value.data(), static_cast<size_type>(value.size()));
+}
+
+template <class... Args>
+inline void print(Args const &...args)
+{
+	(write(args), ...);
+}
+
+template <class... Args>
+inline void println(Args const &...args)
+{
+	print(args...);
+	write("\n", 1);
+}
+
+template <class... Args>
+inline void perr(Args const &...args)
+{
+	(errwrite(args), ...);
+}
+
+template <class... Args>
+inline void perrln(Args const &...args)
+{
+	perr(args...);
+	errwrite("\n", 1);
+}
+
+} // namespace io
+} // namespace fast_io
