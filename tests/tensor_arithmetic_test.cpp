@@ -12,6 +12,10 @@ using MatrixAny = tenspec::Tensor<tenspec::Shape<2, 3>, tenspec::DType::F32,
 								  tenspec::Device::CPU, tenspec::Layout::Any>;
 using Bias = tenspec::Tensor<tenspec::Shape<3>, tenspec::DType::F32,
 							 tenspec::Device::CPU, tenspec::Layout::Contiguous>;
+using NormWeight = tenspec::Tensor<tenspec::Shape<3>, tenspec::DType::F32,
+								   tenspec::Device::CPU, tenspec::Layout::Contiguous>;
+using NormBias = tenspec::Tensor<tenspec::Shape<3>, tenspec::DType::F32,
+								 tenspec::Device::CPU, tenspec::Layout::Contiguous>;
 using Column = tenspec::Tensor<tenspec::Shape<2, 1>, tenspec::DType::F32,
 							   tenspec::Device::CPU, tenspec::Layout::Contiguous>;
 using MatrixFlat = tenspec::Tensor<tenspec::Shape<6>, tenspec::DType::F32,
@@ -49,6 +53,24 @@ static_assert(::std::same_as<
 static_assert(::std::same_as<
 			  decltype(::std::declval<Matrix const &>().softmax(1)),
 			  Matrix>);
+static_assert(::std::same_as<
+			  decltype(::std::declval<Matrix const &>().gelu()),
+			  Matrix>);
+static_assert(::std::same_as<
+			  decltype(::std::declval<Matrix const &>().layer_norm<3>()),
+			  MatrixAny>);
+static_assert(::std::same_as<
+			  decltype(::std::declval<Matrix const &>().layer_norm(
+				  ::std::declval<NormWeight const &>(),
+				  ::std::declval<NormBias const &>())),
+			  MatrixAny>);
+static_assert(::std::same_as<
+			  decltype(::std::declval<Matrix const &>().rms_norm<3>()),
+			  MatrixAny>);
+static_assert(::std::same_as<
+			  decltype(::std::declval<Matrix const &>().rms_norm(
+				  ::std::declval<NormWeight const &>())),
+			  MatrixAny>);
 static_assert(::std::same_as<
 			  decltype(::std::declval<Matrix const &>().flatten<>()),
 			  MatrixFlat>);
@@ -97,6 +119,8 @@ void expect_allclose(char const *name, ::at::Tensor const &actual,
 int main()
 {
 	auto bias_raw{::at::tensor({10.0F, 20.0F, 30.0F}, options())};
+	auto norm_weight_raw{::at::tensor({1.0F, 1.5F, 2.0F}, options())};
+	auto norm_bias_raw{::at::tensor({0.5F, -0.5F, 1.0F}, options())};
 	auto column_raw{::at::tensor({1.0F, 2.0F}, options()).view({2, 1})};
 	auto twos_raw{::at::ones({2, 3}, options()).mul(2.0F)};
 
@@ -139,6 +163,30 @@ int main()
 	expect_allclose("softmax_runtime_dim",
 					Matrix::retain(matrix_raw()).softmax(1).unsafe_raw(),
 					matrix_raw().softmax(1));
+	expect_allclose("gelu_default",
+					Matrix::retain(matrix_raw()).gelu().unsafe_raw(),
+					::at::gelu(matrix_raw()));
+	expect_allclose("gelu_tanh",
+					Matrix::retain(matrix_raw()).gelu("tanh").unsafe_raw(),
+					::at::gelu(matrix_raw(), "tanh"));
+	expect_allclose("layer_norm_static",
+					Matrix::retain(matrix_raw()).layer_norm<3>().unsafe_raw(),
+					::at::layer_norm(matrix_raw(), {3}));
+	expect_allclose("layer_norm_weight_bias",
+					Matrix::retain(matrix_raw())
+						.layer_norm(NormWeight::retain(norm_weight_raw),
+									NormBias::retain(norm_bias_raw))
+						.unsafe_raw(),
+					::at::layer_norm(matrix_raw(), {3}, norm_weight_raw,
+									 norm_bias_raw));
+	expect_allclose("rms_norm_static",
+					Matrix::retain(matrix_raw()).rms_norm<3>().unsafe_raw(),
+					::at::rms_norm(matrix_raw(), {3}));
+	expect_allclose("rms_norm_weight",
+					Matrix::retain(matrix_raw())
+						.rms_norm(NormWeight::retain(norm_weight_raw), 1e-5)
+						.unsafe_raw(),
+					::at::rms_norm(matrix_raw(), {3}, norm_weight_raw, 1e-5));
 
 	expect_allclose("flatten_static",
 					Matrix::retain(matrix_raw()).flatten<>().unsafe_raw(),

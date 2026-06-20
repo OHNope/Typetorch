@@ -3,7 +3,10 @@ module;
 #include <ATen/ATen.h>
 #include <ATen/core/grad_mode.h>
 #include <ATen/Parallel.h>
+#include <ATen/ops/gelu.h>
 #include <ATen/ops/gt.h>
+#include <ATen/ops/layer_norm.h>
+#include <ATen/ops/rms_norm.h>
 #include <ATen/ops/where.h>
 
 export module libtorch;
@@ -28,11 +31,15 @@ using ::at::kHalf;
 using ::at::kLong;
 using ::at::arange;
 using ::at::empty;
+using ::at::gelu;
+using ::at::gelu_;
 using ::at::get_num_threads;
 using ::at::gt;
+using ::at::layer_norm;
 using ::at::ones;
 using ::at::rand;
 using ::at::randn;
+using ::at::rms_norm;
 using ::at::set_num_interop_threads;
 using ::at::set_num_threads;
 using ::at::tensor;
@@ -43,5 +50,6 @@ using ::at::zeros;
 export namespace c10
 {
 using ::c10::DeviceType;
+using ::c10::string_view;
 using ::c10::toString;
 } // namespace c10

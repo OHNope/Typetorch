@@ -53,6 +53,10 @@ export import :tensor_base;
 	typename[: ::tenspec::detail::unsqueeze_shape_meta( \
 				   ShapeKind::dims, Dim):]
 
+#define NORMALIZED_SHAPE_COMPATIBLE(InputShape, NormalizedShape) \
+	(::tenspec::detail::normalized_shape_compatible(             \
+		InputShape::dims, NormalizedShape::dims))
+
 export namespace tenspec
 {
 
@@ -116,6 +120,20 @@ public:
 	inline void relu_()
 	{
 		unsafe_raw().relu_();
+	}
+
+	[[nodiscard]] inline auto gelu(::c10::string_view approximate = "none") const
+	{
+		static_assert(dtype == DType::Any || detail::is_floating_dtype(dtype),
+					  "Tensor::gelu() requires floating tensor dtype");
+		return unsafe_move(::at::gelu(unsafe_raw(), approximate));
+	}
+	inline void gelu_(::c10::string_view approximate = "none")
+	{
+		static_assert(dtype == DType::Any || detail::is_floating_dtype(dtype),
+					  "Tensor::gelu_() requires floating tensor dtype");
+		::at::Tensor raw{unsafe_raw()};
+		::at::gelu_(raw, approximate);
 	}
 
 	[[nodiscard]] inline auto softmax(::std::int64_t const dim) const
@@ -302,6 +320,113 @@ public:
 		using Result = Tensor<UNSQUEEZE_SHAPE_T(shape, Dim), dtype, device,
 							  layout>;
 		return Result::unsafe_move(unsafe_raw().unsqueeze(Dim));
+	}
+
+	template <::std::int64_t... NormalizedDims>
+	[[nodiscard]] inline auto layer_norm(double const eps = 1e-5,
+										 bool const cudnn_enable = true) const
+	{
+		static_assert(sizeof...(NormalizedDims) > 0,
+					  "Tensor::layer_norm() requires a non-empty normalized shape");
+		static_assert(dtype == DType::Any || detail::is_floating_dtype(dtype),
+					  "Tensor::layer_norm() requires floating tensor dtype");
+		using NormalizedShape = Shape<NormalizedDims...>;
+		static_assert(NORMALIZED_SHAPE_COMPATIBLE(shape, NormalizedShape),
+					  "normalized_shape must match the trailing input dimensions");
+		constexpr ::std::int64_t normalized_shape[]{NormalizedDims...};
+		using Result = Tensor<shape, dtype, device, Layout::Any>;
+		return Result::unsafe_move(::at::layer_norm(
+			unsafe_raw(), normalized_shape, ::std::optional<::at::Tensor>{},
+			::std::optional<::at::Tensor>{}, eps, cudnn_enable));
+	}
+
+	template <TensorLike Weight, TensorLike Bias>
+	[[nodiscard]] inline auto layer_norm(Weight const &weight, Bias const &bias,
+										 double const eps = 1e-5,
+										 bool const cudnn_enable = true) const
+	{
+		static_assert(dtype == DType::Any || detail::is_floating_dtype(dtype),
+					  "Tensor::layer_norm() requires floating tensor dtype");
+		using NormalizedShape = typename Weight::shape;
+		using BiasShape = typename Bias::shape;
+		static_assert(detail::same_shape(NormalizedShape::dims, BiasShape::dims),
+					  "layer_norm weight and bias must have the same shape");
+		static_assert(NORMALIZED_SHAPE_COMPATIBLE(shape, NormalizedShape),
+					  "weight shape must match the trailing input dimensions");
+		using Result =
+			Tensor<shape, dtype,
+				   common_device(common_device(device, Weight::device), Bias::device),
+				   Layout::Any>;
+		return Result::unsafe_move(::at::layer_norm(
+			unsafe_raw(), NormalizedShape::dims,
+			::std::optional<::at::Tensor>{weight.unsafe_raw()},
+			::std::optional<::at::Tensor>{bias.unsafe_raw()}, eps, cudnn_enable));
+	}
+
+	template <::std::int64_t... NormalizedDims>
+	[[nodiscard]] inline auto rms_norm() const
+	{
+		static_assert(sizeof...(NormalizedDims) > 0,
+					  "Tensor::rms_norm() requires a non-empty normalized shape");
+		static_assert(dtype == DType::Any || detail::is_floating_dtype(dtype),
+					  "Tensor::rms_norm() requires floating tensor dtype");
+		using NormalizedShape = Shape<NormalizedDims...>;
+		static_assert(NORMALIZED_SHAPE_COMPATIBLE(shape, NormalizedShape),
+					  "normalized_shape must match the trailing input dimensions");
+		constexpr ::std::int64_t normalized_shape[]{NormalizedDims...};
+		using Result = Tensor<shape, dtype, device, Layout::Any>;
+		return Result::unsafe_move(::at::rms_norm(
+			unsafe_raw(), normalized_shape, ::std::optional<::at::Tensor>{},
+			::std::optional<double>{}));
+	}
+
+	template <::std::int64_t... NormalizedDims>
+	[[nodiscard]] inline auto rms_norm(double const eps) const
+	{
+		static_assert(sizeof...(NormalizedDims) > 0,
+					  "Tensor::rms_norm() requires a non-empty normalized shape");
+		static_assert(dtype == DType::Any || detail::is_floating_dtype(dtype),
+					  "Tensor::rms_norm() requires floating tensor dtype");
+		using NormalizedShape = Shape<NormalizedDims...>;
+		static_assert(NORMALIZED_SHAPE_COMPATIBLE(shape, NormalizedShape),
+					  "normalized_shape must match the trailing input dimensions");
+		constexpr ::std::int64_t normalized_shape[]{NormalizedDims...};
+		using Result = Tensor<shape, dtype, device, Layout::Any>;
+		return Result::unsafe_move(::at::rms_norm(
+			unsafe_raw(), normalized_shape, ::std::optional<::at::Tensor>{},
+			::std::optional<double>{eps}));
+	}
+
+	template <TensorLike Weight>
+	[[nodiscard]] inline auto rms_norm(Weight const &weight) const
+	{
+		static_assert(dtype == DType::Any || detail::is_floating_dtype(dtype),
+					  "Tensor::rms_norm() requires floating tensor dtype");
+		using NormalizedShape = typename Weight::shape;
+		static_assert(NORMALIZED_SHAPE_COMPATIBLE(shape, NormalizedShape),
+					  "weight shape must match the trailing input dimensions");
+		using Result = Tensor<shape, dtype, common_device(device, Weight::device),
+							  Layout::Any>;
+		return Result::unsafe_move(::at::rms_norm(
+			unsafe_raw(), NormalizedShape::dims,
+			::std::optional<::at::Tensor>{weight.unsafe_raw()},
+			::std::optional<double>{}));
+	}
+
+	template <TensorLike Weight>
+	[[nodiscard]] inline auto rms_norm(Weight const &weight, double const eps) const
+	{
+		static_assert(dtype == DType::Any || detail::is_floating_dtype(dtype),
+					  "Tensor::rms_norm() requires floating tensor dtype");
+		using NormalizedShape = typename Weight::shape;
+		static_assert(NORMALIZED_SHAPE_COMPATIBLE(shape, NormalizedShape),
+					  "weight shape must match the trailing input dimensions");
+		using Result = Tensor<shape, dtype, common_device(device, Weight::device),
+							  Layout::Any>;
+		return Result::unsafe_move(::at::rms_norm(
+			unsafe_raw(), NormalizedShape::dims,
+			::std::optional<::at::Tensor>{weight.unsafe_raw()},
+			::std::optional<double>{eps}));
 	}
 
 	template <TensorLike Mask>
