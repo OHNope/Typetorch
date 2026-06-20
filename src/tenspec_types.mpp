@@ -1,0 +1,69 @@
+export module tenspec:types;
+
+import std;
+
+export namespace tenspec
+{
+
+constexpr inline ::std::int64_t infer{-1};
+constexpr inline ::std::int64_t dyn{-2};
+
+template <::std::int64_t... Dims>
+struct Shape
+{
+	static_assert(((Dims >= 0 || Dims == dyn) && ...),
+				  "Shape dimensions must be non-negative or dyn");
+
+	static constexpr inline ::std::size_t rank{sizeof...(Dims)};
+	static constexpr inline ::std::int64_t dims[rank]{Dims...};
+	static constexpr inline ::std::size_t dynamic_rank{
+		(0uz + ... + (Dims == dyn ? 1uz : 0uz))};
+};
+
+consteval inline auto
+is_template_specialization_of(::std::meta::info type_reflect,
+							  ::std::meta::info expected_template) noexcept
+	-> bool
+{
+	if (!::std::meta::has_template_arguments(type_reflect))
+	{
+		return false;
+	}
+	return ::std::meta::template_of(type_reflect) == expected_template;
+}
+
+template <class T>
+concept ShapeLike = is_template_specialization_of(^^T, ^^Shape);
+
+enum class DType
+{
+	Any,
+	F32,
+	F16,
+	BF16,
+	I64,
+	Bool,
+};
+
+enum class Device
+{
+	Any,
+	CPU,
+	CUDA,
+};
+
+enum class Layout
+{
+	Any,
+	Contiguous,
+	NonContiguous,
+};
+
+template <ShapeLike ShapeKind, DType DTypeKind = DType::F32,
+		  Device DeviceKind = Device::CPU, Layout LayoutKind = Layout::Contiguous>
+class Tensor;
+
+template <class T>
+concept TensorLike = is_template_specialization_of(^^T, ^^Tensor);
+
+} // namespace tenspec

@@ -1,0 +1,21 @@
+export module tenspec.capi_bridge;
+
+import python;
+
+export extern "C"
+{
+
+	struct tenspec_python_function
+	{
+		char const *name{};
+		char const *doc{};
+		python::PyCFunction invoke{};
+	};
+
+	using tenspec_python_visit_fn = void (*)(tenspec_python_function const *function,
+											 void *user) noexcept;
+
+	void tenspec_python_for_each_function(tenspec_python_visit_fn visit,
+										  void *user) noexcept;
+
+} // export extern "C"

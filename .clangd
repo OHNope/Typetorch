@@ -1,0 +1,18 @@
+CompileFlags:
+    CompilationDatabase: .
+    Remove:
+        - -freflection
+        - -fmodules
+        - -flto
+        - -march=*
+    Add:
+        - -std=c++2c
+Diagnostics:
+    Suppress:
+        - unknown_argument
+        - unsupported-option
+---
+If:
+    PathMatch: (bindings/.*\.cpp|src/.*\.cpp|examples/.*\.cpp|tests/.*\.cpp|include/tenspec/.*\.hpp)
+Diagnostics:
+    Suppress: ["*"]

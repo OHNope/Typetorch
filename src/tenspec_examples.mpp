@@ -1,0 +1,36 @@
+export module tenspec.examples;
+
+export import std;
+export import libtorch;
+export import tenspec;
+
+export namespace tenspec_examples
+{
+
+using Vector = tenspec::Tensor<tenspec::Shape<tenspec::dyn>,
+							   tenspec::DType::F32, tenspec::Device::CPU,
+							   tenspec::Layout::Any>;
+using Matrix = tenspec::Tensor<tenspec::Shape<tenspec::dyn, tenspec::dyn>,
+							   tenspec::DType::F32, tenspec::Device::CPU,
+							   tenspec::Layout::Any>;
+using Matrix3In = tenspec::Tensor<tenspec::Shape<tenspec::dyn, 3>,
+								  tenspec::DType::F32, tenspec::Device::CPU,
+								  tenspec::Layout::Any>;
+using Matrix3Out = tenspec::Tensor<tenspec::Shape<3, tenspec::dyn>,
+								   tenspec::DType::F32, tenspec::Device::CPU,
+								   tenspec::Layout::Any>;
+using Matrix2Out = tenspec::Tensor<tenspec::Shape<tenspec::dyn, 2>,
+								   tenspec::DType::F32, tenspec::Device::CPU,
+								   tenspec::Layout::Any>;
+using SizeVector = tenspec::Tensor<tenspec::Shape<1>, tenspec::DType::I64,
+								   tenspec::Device::CPU>;
+
+SizeVector checked_vector_sizes(Vector const &x);
+Vector add_vectors(Vector const &a, Vector const &b);
+Matrix add_bias(Matrix const &x, Vector const &bias);
+Matrix matmul_3_inner(Matrix3In const &x, Matrix3Out const &weight);
+Matrix2Out linear_3_to_2(Matrix3In const &x);
+Matrix transpose_matrix(Matrix const &x);
+::std::int64_t numel_plus(Matrix const &x, ::std::int64_t extra);
+
+} // namespace tenspec_examples

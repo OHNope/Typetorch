@@ -1,0 +1,111 @@
+export module tenspec:runtime_checks;
+
+import std;
+import libtorch;
+export import :types;
+
+export namespace tenspec
+{
+
+namespace detail
+{
+
+inline auto dtype_matches(DType expected, ::at::ScalarType actual) noexcept
+	-> bool
+{
+	switch (expected)
+	{
+	case DType::Any:
+		return true;
+	case DType::F32:
+		return actual == ::at::kFloat;
+	case DType::F16:
+		return actual == ::at::kHalf;
+
+	case DType::BF16:
+		return actual == ::at::kBFloat16;
+	case DType::I64:
+		return actual == ::at::kLong;
+	case DType::Bool:
+		return actual == ::at::kBool;
+	}
+	return false;
+}
+
+inline auto device_matches(Device expected, ::at::Tensor const &raw) noexcept
+	-> bool
+{
+	switch (expected)
+	{
+	case Device::Any:
+		return true;
+	case Device::CPU:
+		return raw.device().is_cpu();
+	case Device::CUDA:
+		return raw.is_cuda();
+	}
+	return false;
+}
+
+inline auto layout_matches(Layout expected, ::at::Tensor const &raw) noexcept
+	-> bool
+{
+	switch (expected)
+	{
+	case Layout::Any:
+		return true;
+	case Layout::Contiguous:
+		return raw.is_contiguous();
+	case Layout::NonContiguous:
+		return !raw.is_contiguous();
+	}
+	return false;
+}
+
+inline void
+check_shape_compatible_runtime(::at::Tensor const &raw,
+							   ::std::span<::std::int64_t const> dims)
+{
+	if (raw.dim() != static_cast<::std::int64_t>(dims.size()))
+	{
+		::std::terminate();
+	}
+
+	for (::std::size_t i{0}; i < dims.size(); ++i)
+	{
+		::std::int64_t const expected{dims[i]};
+		if (expected == dyn)
+		{
+			continue;
+		}
+
+		if (raw.size(static_cast<::std::int64_t>(i)) != static_cast<::std::int64_t>(expected))
+		{
+			::std::terminate();
+		}
+	}
+}
+
+inline void
+check_tensor_compatible_runtime(::at::Tensor const &raw,
+								::std::span<::std::int64_t const> dims,
+								DType dtype, Device device, Layout layout)
+{
+	check_shape_compatible_runtime(raw, dims);
+	if (!dtype_matches(dtype, raw.scalar_type()))
+	{
+		::std::terminate();
+	}
+	if (!device_matches(device, raw))
+	{
+		::std::terminate();
+	}
+	if (!layout_matches(layout, raw))
+	{
+		::std::terminate();
+	}
+}
+
+} // namespace detail
+
+} // namespace tenspec

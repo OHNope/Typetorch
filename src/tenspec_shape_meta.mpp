@@ -1,0 +1,491 @@
+export module tenspec:shape_meta;
+
+import std;
+export import :types;
+
+export namespace tenspec
+{
+
+namespace detail
+{
+
+consteval inline auto
+broadcast_compatible(::std::span<::std::int64_t const> ldims,
+					 ::std::span<::std::int64_t const> rdims) noexcept -> bool
+{
+	::std::size_t const lrank{ldims.size()};
+	::std::size_t const rrank{rdims.size()};
+	::std::size_t const out_rank{lrank > rrank ? lrank : rrank};
+	::std::size_t const lhs_offset{out_rank - lrank};
+	::std::size_t const rhs_offset{out_rank - rrank};
+
+	for (::std::size_t i{0}; i < out_rank; ++i)
+	{
+		::std::int64_t const lhs_dim{i < lhs_offset ? 1 : ldims[i - lhs_offset]};
+		::std::int64_t const rhs_dim{i < rhs_offset ? 1 : rdims[i - rhs_offset]};
+
+		if (lhs_dim == rhs_dim || lhs_dim == 1 || rhs_dim == 1 || lhs_dim == dyn ||
+			rhs_dim == dyn)
+		{
+			continue;
+		}
+
+		return false;
+	}
+
+	return true;
+}
+
+consteval inline auto broadcast_dim(::std::int64_t lhs_dim,
+									::std::int64_t rhs_dim) noexcept
+	-> ::std::int64_t
+{
+	if (lhs_dim == rhs_dim)
+	{
+		return lhs_dim;
+	}
+	if (lhs_dim == 1)
+	{
+		return rhs_dim;
+	}
+	if (rhs_dim == 1)
+	{
+		return lhs_dim;
+	}
+	return dyn;
+}
+
+consteval inline void append_dim(::std::vector<::std::meta::info> &args,
+								 ::std::int64_t dim) noexcept
+{
+	args.push_back(::std::meta::reflect_constant(dim));
+}
+
+consteval inline void
+append_shape_range(::std::vector<::std::meta::info> &args, ::std::size_t begin,
+				   ::std::size_t end,
+				   ::std::span<::std::int64_t const> dims) noexcept
+{
+	for (::std::size_t i{begin}; i < end; ++i)
+	{
+		append_dim(args, dims[i]);
+	}
+}
+
+consteval inline void append_broadcast_shape(
+	::std::vector<::std::meta::info> &args,
+	::std::span<::std::int64_t const> ldims,
+	::std::span<::std::int64_t const> rdims)
+{
+	::std::size_t const lrank{ldims.size()};
+	::std::size_t const rrank{rdims.size()};
+	::std::size_t const out_rank{lrank > rrank ? lrank : rrank};
+	::std::size_t const lhs_offset{out_rank - lrank};
+	::std::size_t const rhs_offset{out_rank - rrank};
+
+	for (::std::size_t i{0}; i < out_rank; ++i)
+	{
+		::std::int64_t const lhs_dim{i < lhs_offset ? 1 : ldims[i - lhs_offset]};
+		::std::int64_t const rhs_dim{i < rhs_offset ? 1 : rdims[i - rhs_offset]};
+		append_dim(args, broadcast_dim(lhs_dim, rhs_dim));
+	}
+}
+
+consteval auto broadcast_shape_meta(::std::span<::std::int64_t const> ldims,
+									::std::span<::std::int64_t const> rdims)
+	-> ::std::meta::info
+{
+	::std::size_t const lrank{ldims.size()};
+	::std::size_t const rrank{rdims.size()};
+	::std::vector<::std::meta::info> args;
+	args.reserve(lrank > rrank ? lrank : rrank);
+	append_broadcast_shape(args, ldims, rdims);
+	return ::std::meta::substitute(^^Shape, args);
+}
+
+consteval auto dynamic_shape_meta(::std::size_t rank) -> ::std::meta::info
+{
+	::std::vector<::std::meta::info> args;
+	args.reserve(rank);
+	for (::std::size_t i{0}; i < rank; ++i)
+	{
+		append_dim(args, dyn);
+	}
+	return ::std::meta::substitute(^^Shape, args);
+}
+
+consteval auto
+matmul_shape_meta(::std::span<::std::int64_t const> ldims,
+				  ::std::span<::std::int64_t const> rdims)
+	-> ::std::meta::info
+{
+	::std::size_t const lrank{ldims.size()};
+	::std::size_t const rrank{rdims.size()};
+	if (lrank < 1)
+	{
+		throw "matmul lhs rank must be >= 1";
+	}
+	if (rrank < 1)
+	{
+		throw "matmul rhs rank must be >= 1";
+	}
+
+	::std::vector<::std::meta::info> args;
+
+	if (lrank == 1 && rrank == 1)
+	{
+		if (!(ldims[0] == dyn || rdims[0] == dyn || ldims[0] == rdims[0]))
+		{
+			throw "dot matmul expects matching vector length";
+		}
+	}
+	else if (lrank >= 2 && rrank == 1)
+	{
+		if (!(ldims[lrank - 1] == dyn || rdims[0] == dyn ||
+			  ldims[lrank - 1] == rdims[0]))
+		{
+			throw "matrix-vector matmul inner dim mismatch";
+		}
+
+		args.reserve(lrank - 1);
+		append_shape_range(args, 0, lrank - 1, ldims);
+	}
+	else if (lrank == 1 && rrank >= 2)
+	{
+		if (!(ldims[0] == dyn || rdims[rrank - 2] == dyn ||
+			  ldims[0] == rdims[rrank - 2]))
+		{
+			throw "vector-matrix matmul inner dim mismatch";
+		}
+
+		args.reserve(rrank - 1);
+		append_shape_range(args, 0, rrank - 2, rdims);
+		append_dim(args, rdims[rrank - 1]);
+	}
+	else
+	{
+		if (!(ldims[lrank - 1] == dyn || rdims[rrank - 2] == dyn ||
+			  ldims[lrank - 1] == rdims[rrank - 2]))
+		{
+			throw "matrix matmul inner dim mismatch";
+		}
+		if (!broadcast_compatible(ldims.first(lrank - 2),
+								  rdims.first(rrank - 2)))
+		{
+			throw "matmul batch dimensions are not broadcast-compatible";
+		}
+
+		::std::size_t const batch_rank{lrank > rrank ? lrank - 2 : rrank - 2};
+		args.reserve(batch_rank + 2);
+		append_broadcast_shape(args, ldims.first(lrank - 2),
+							   rdims.first(rrank - 2));
+		append_dim(args, ldims[lrank - 2]);
+		append_dim(args, rdims[rrank - 1]);
+	}
+
+	return ::std::meta::substitute(^^Shape, args);
+}
+
+consteval inline auto normalize_dim(::std::int64_t dim,
+									::std::size_t rank) -> ::std::size_t
+{
+	::std::int64_t const signed_rank{static_cast<::std::int64_t>(rank)};
+	::std::int64_t const normalized{dim < 0 ? dim + signed_rank : dim};
+
+	if (normalized < 0 || normalized >= signed_rank)
+	{
+		throw "dimension out of range";
+	}
+
+	return static_cast<::std::size_t>(normalized);
+}
+
+consteval auto transpose_shape_meta(::std::span<::std::int64_t const> dims,
+									::std::int64_t dim0,
+									::std::int64_t dim1) -> ::std::meta::info
+{
+	::std::size_t const rank{dims.size()};
+	::std::size_t const normalized_dim0{normalize_dim(dim0, rank)};
+	::std::size_t const normalized_dim1{normalize_dim(dim1, rank)};
+
+	::std::vector<::std::meta::info> args;
+	args.reserve(rank);
+	for (::std::size_t i{0}; i < rank; ++i)
+	{
+		::std::size_t source{i};
+		if (i == normalized_dim0)
+		{
+			source = normalized_dim1;
+		}
+		else if (i == normalized_dim1)
+		{
+			source = normalized_dim0;
+		}
+
+		append_dim(args, dims[source]);
+	}
+
+	return ::std::meta::substitute(^^Shape, args);
+}
+
+consteval inline auto transpose_layout(Layout layout,
+									   ::std::span<::std::int64_t const> dims,
+									   ::std::int64_t dim0,
+									   ::std::int64_t dim1) -> Layout
+{
+	::std::size_t const rank{dims.size()};
+	::std::size_t const normalized_dim0{normalize_dim(dim0, rank)};
+	::std::size_t const normalized_dim1{normalize_dim(dim1, rank)};
+
+	return normalized_dim0 == normalized_dim1 ? layout : Layout::Any;
+}
+
+consteval auto permute_shape_meta(::std::span<::std::int64_t const> dims,
+								  ::std::span<::std::int64_t const> permute_dims)
+	-> ::std::meta::info
+{
+	::std::size_t const rank{dims.size()};
+	if (permute_dims.size() != rank)
+	{
+		throw "permute() expects one dimension index per input dimension";
+	}
+
+	::std::vector<::std::meta::info> args;
+	args.reserve(rank);
+
+	for (::std::size_t i{0}; i < rank; ++i)
+	{
+		::std::size_t const source{normalize_dim(permute_dims[i], rank)};
+		for (::std::size_t j{0}; j < i; ++j)
+		{
+			if (normalize_dim(permute_dims[j], rank) == source)
+			{
+				throw "permute() dimension indices must be unique";
+			}
+		}
+		append_dim(args, dims[source]);
+	}
+
+	return ::std::meta::substitute(^^Shape, args);
+}
+
+consteval inline auto permute_layout(Layout layout,
+									 ::std::span<::std::int64_t const> dims,
+									 ::std::span<::std::int64_t const> permute_dims)
+	-> Layout
+{
+	::std::size_t const rank{dims.size()};
+	if (permute_dims.size() != rank)
+	{
+		throw "permute() expects one dimension index per input dimension";
+	}
+
+	for (::std::size_t i{0}; i < rank; ++i)
+	{
+		if (normalize_dim(permute_dims[i], rank) != i)
+		{
+			return Layout::Any;
+		}
+	}
+	return layout;
+}
+
+consteval inline auto view_shape_meta(
+	::std::span<::std::int64_t const> dims,
+	::std::span<::std::int64_t const> res_dims) -> ::std::meta::info
+{
+	::std::vector<::std::meta::info> args;
+	args.reserve(res_dims.size());
+
+	::std::int64_t elem_size{1};
+	bool has_dynamic_input{false};
+
+	for (::std::int64_t dim : dims)
+	{
+		if (dim == dyn)
+		{
+			has_dynamic_input = true;
+		}
+		else
+		{
+			elem_size *= dim;
+		}
+	}
+
+	constexpr ::std::size_t no_infer =
+		static_cast<::std::size_t>(-1);
+
+	::std::size_t infer_pos{no_infer};
+	::std::int64_t res_elem_size{1};
+
+	for (::std::size_t i{0}; i < res_dims.size(); ++i)
+	{
+		::std::int64_t res_dim = res_dims[i];
+
+		if (res_dim == infer)
+		{
+			if (infer_pos != no_infer)
+			{
+				throw "view() can only have one \"-1\", the infer, in the parameters";
+			}
+
+			infer_pos = i;
+			append_dim(args, dyn);
+			continue;
+		}
+
+		if (res_dim == dyn)
+		{
+			throw "view() result dimensions cannot be dyn";
+		}
+
+		if (res_dim < 0)
+		{
+			throw "view() dimensions must be non-negative or infer";
+		}
+
+		res_elem_size *= res_dim;
+		append_dim(args, res_dim);
+	}
+
+	bool has_infer = infer_pos != no_infer;
+
+	if (!has_dynamic_input)
+	{
+		if (has_infer)
+		{
+			if (res_elem_size == 0)
+			{
+				throw "in view(), cannot infer dimension when known result size is zero";
+			}
+
+			if (elem_size % res_elem_size != 0)
+			{
+				throw "in view(), the deduced dim for the new tensor should be an integer!";
+			}
+
+			args[infer_pos] =
+				::std::meta::reflect_constant(elem_size / res_elem_size);
+		}
+		else if (elem_size != res_elem_size)
+		{
+			throw "the sizes of the elements of the two tensors must be the same!";
+		}
+	}
+
+	return ::std::meta::substitute(^^Shape, args);
+}
+
+consteval inline auto flatten_shape_meta(
+	::std::span<::std::int64_t const> dims, ::std::int64_t start_dim,
+	::std::int64_t end_dim) -> ::std::meta::info
+{
+	::std::size_t const rank{dims.size()};
+	if (rank == 0)
+	{
+		throw "flatten() requires tensor rank >= 1";
+	}
+
+	::std::size_t const start{normalize_dim(start_dim, rank)};
+	::std::size_t const end{normalize_dim(end_dim, rank)};
+	if (start > end)
+	{
+		throw "flatten() expects start_dim <= end_dim";
+	}
+
+	::std::vector<::std::meta::info> args;
+	args.reserve(rank - (end - start));
+	append_shape_range(args, 0, start, dims);
+
+	::std::int64_t flattened{1};
+	bool dynamic{false};
+	for (::std::size_t i{start}; i <= end; ++i)
+	{
+		if (dims[i] == dyn)
+		{
+			dynamic = true;
+		}
+		else
+		{
+			flattened *= dims[i];
+		}
+	}
+	append_dim(args, dynamic ? dyn : flattened);
+
+	append_shape_range(args, end + 1, rank, dims);
+	return ::std::meta::substitute(^^Shape, args);
+}
+
+consteval inline auto squeeze_shape_meta(
+	::std::span<::std::int64_t const> dims) -> ::std::meta::info
+{
+	::std::vector<::std::meta::info> args;
+	args.reserve(dims.size());
+	for (::std::int64_t dim : dims)
+	{
+		if (dim == dyn)
+		{
+			throw "squeeze() requires statically known dimensions";
+		}
+		if (dim != 1)
+		{
+			append_dim(args, dim);
+		}
+	}
+	return ::std::meta::substitute(^^Shape, args);
+}
+
+consteval inline auto squeeze_shape_meta(
+	::std::span<::std::int64_t const> dims, ::std::int64_t dim) -> ::std::meta::info
+{
+	::std::size_t const rank{dims.size()};
+	::std::size_t const normalized{normalize_dim(dim, rank)};
+	if (dims[normalized] == dyn)
+	{
+		throw "squeeze(dim) requires the selected dimension to be statically known";
+	}
+
+	::std::vector<::std::meta::info> args;
+	args.reserve(dims[normalized] == 1 ? rank - 1 : rank);
+	for (::std::size_t i{0}; i < rank; ++i)
+	{
+		if (i == normalized && dims[i] == 1)
+		{
+			continue;
+		}
+		append_dim(args, dims[i]);
+	}
+	return ::std::meta::substitute(^^Shape, args);
+}
+
+consteval inline auto unsqueeze_shape_meta(
+	::std::span<::std::int64_t const> dims, ::std::int64_t dim) -> ::std::meta::info
+{
+	::std::size_t const rank{dims.size()};
+	::std::int64_t const signed_rank{static_cast<::std::int64_t>(rank)};
+	::std::int64_t const normalized{dim < 0 ? dim + signed_rank + 1 : dim};
+	if (normalized < 0 || normalized > signed_rank)
+	{
+		throw "unsqueeze() dimension out of range";
+	}
+
+	::std::size_t const insert_pos{static_cast<::std::size_t>(normalized)};
+	::std::vector<::std::meta::info> args;
+	args.reserve(rank + 1);
+	append_shape_range(args, 0, insert_pos, dims);
+	append_dim(args, 1);
+	append_shape_range(args, insert_pos, rank, dims);
+	return ::std::meta::substitute(^^Shape, args);
+}
+
+consteval inline void check_contiguous_compiletime(Layout const layout)
+{
+	if (layout != Layout::Contiguous)
+	{
+		throw "Tensor should be contiguous!";
+	}
+}
+
+} // namespace detail
+
+} // namespace tenspec

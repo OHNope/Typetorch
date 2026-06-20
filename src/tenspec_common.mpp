@@ -1,0 +1,28 @@
+export module tenspec:common;
+
+export import :types;
+
+export namespace tenspec
+{
+
+consteval inline auto common_dtype(DType const LhsDType,
+								   DType const RhsDType) noexcept -> DType
+{
+	return LhsDType == RhsDType ? LhsDType : DType::Any;
+}
+
+consteval inline auto common_device(Device const LhsDevice,
+									Device const RhsDevice) noexcept -> Device
+{
+	return LhsDevice == RhsDevice ? LhsDevice : Device::Any;
+}
+
+namespace detail
+{
+consteval inline auto is_floating_dtype(DType dtype) noexcept -> bool
+{
+	return dtype == DType::F32 || dtype == DType::F16 || dtype == DType::BF16;
+}
+} // namespace detail
+
+} // namespace tenspec

@@ -1,0 +1,99 @@
+module;
+
+#define PY_SSIZE_T_CLEAN
+#include <Python.h>
+#include <torch/csrc/autograd/python_variable.h>
+
+export module python;
+
+export namespace python
+{
+using ::PyCFunction_NewEx;
+using ::PyBool_FromLong;
+using ::PyCapsule_GetPointer;
+using ::PyCapsule_New;
+using ::PyCFunction;
+using ::PyErr_Format;
+using ::PyErr_Occurred;
+using ::PyErr_SetString;
+using ::PyFloat_AsDouble;
+using ::PyFloat_FromDouble;
+using ::PyImport_ImportModule;
+using ::PyLong_AsLongLong;
+using ::PyLong_AsUnsignedLongLong;
+using ::PyLong_FromLongLong;
+using ::PyLong_FromUnsignedLongLong;
+using ::PyMethodDef;
+using ::PyModule_AddObject;
+using ::PyModule_Create2;
+using ::PyModuleDef;
+using ::PyObject;
+using ::PyObject_IsTrue;
+using ::PyUnicode_AsUTF8AndSize;
+using ::PyUnicode_FromStringAndSize;
+using ::Py_ssize_t;
+using ::THPVariable_Unpack;
+using ::THPVariable_Wrap;
+
+inline constexpr int meth_varargs{METH_VARARGS};
+
+inline auto decref(PyObject *object) -> void
+{
+	Py_DECREF(object);
+}
+
+inline auto type_error() -> PyObject *
+{
+	return PyExc_TypeError;
+}
+
+inline auto runtime_error() -> PyObject *
+{
+	return PyExc_RuntimeError;
+}
+
+inline auto none() -> PyObject *
+{
+	Py_RETURN_NONE;
+}
+
+inline auto tuple_check(PyObject *object) -> bool
+{
+	return PyTuple_Check(object) != 0;
+}
+
+inline auto tuple_size(PyObject *object) -> Py_ssize_t
+{
+	return PyTuple_GET_SIZE(object);
+}
+
+inline auto tuple_get_item(PyObject *object, Py_ssize_t index) -> PyObject *
+{
+	return PyTuple_GET_ITEM(object, index);
+}
+
+inline auto tensor_check(PyObject *object) -> bool
+{
+	return THPVariable_Check(object) != 0;
+}
+
+inline auto module_def(char const *name, char const *doc) -> PyModuleDef
+{
+	return PyModuleDef{
+		PyModuleDef_HEAD_INIT,
+		name,
+		doc,
+		-1,
+		nullptr,
+		nullptr,
+		nullptr,
+		nullptr,
+		nullptr,
+	};
+}
+
+inline auto module_create(PyModuleDef *definition) -> PyObject *
+{
+	return PyModule_Create(definition);
+}
+}

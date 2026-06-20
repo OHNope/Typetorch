@@ -1,0 +1,461 @@
+export module tenspec:tensor;
+
+import std;
+import libtorch;
+export import :types;
+export import :aten_mappings;
+export import :shape_meta;
+export import :common;
+export import :tensor_base;
+
+#define BROADCAST_COMPATIBLE(LShape, RShape) \
+	(::tenspec::detail::broadcast_compatible(LShape::dims, RShape::dims))
+
+#define BROADCAST_SHAPE_T(LShape, RShape)               \
+	typename[: ::tenspec::detail::broadcast_shape_meta( \
+				   LShape::dims, RShape::dims):]
+
+#define MATMUL_SHAPE_T(LShape, RShape)               \
+	typename[: ::tenspec::detail::matmul_shape_meta( \
+				   LShape::dims, RShape::dims):]
+
+#define TRANSPOSE_SHAPE_T(ShapeKind, Dim0, Dim1)        \
+	typename[: ::tenspec::detail::transpose_shape_meta( \
+				   ShapeKind::dims, Dim0, Dim1):]
+
+#define TRANSPOSE_LAYOUT(ShapeKind, LayoutKind, Dim0, Dim1) \
+	(::tenspec::detail::transpose_layout(LayoutKind, ShapeKind::dims, Dim0, Dim1))
+
+#define PERMUTE_SHAPE_T(ShapeKind, PermuteDims)       \
+	typename[: ::tenspec::detail::permute_shape_meta( \
+				   ShapeKind::dims, PermuteDims):]
+
+#define PERMUTE_LAYOUT(ShapeKind, LayoutKind, PermuteDims) \
+	(::tenspec::detail::permute_layout(LayoutKind, ShapeKind::dims, PermuteDims))
+
+#define VIEW_SHAPE_T(ShapeKind, ResultDims)        \
+	typename[: ::tenspec::detail::view_shape_meta( \
+				   ShapeKind::dims, ResultDims):]
+
+#define FLATTEN_SHAPE_T(ShapeKind, StartDim, EndDim)  \
+	typename[: ::tenspec::detail::flatten_shape_meta( \
+				   ShapeKind::dims, StartDim, EndDim):]
+
+#define SQUEEZE_SHAPE_T(ShapeKind)                    \
+	typename[: ::tenspec::detail::squeeze_shape_meta( \
+				   ShapeKind::dims):]
+
+#define SQUEEZE_DIM_SHAPE_T(ShapeKind, Dim)           \
+	typename[: ::tenspec::detail::squeeze_shape_meta( \
+				   ShapeKind::dims, Dim):]
+
+#define UNSQUEEZE_SHAPE_T(ShapeKind, Dim)               \
+	typename[: ::tenspec::detail::unsqueeze_shape_meta( \
+				   ShapeKind::dims, Dim):]
+
+export namespace tenspec
+{
+
+template <ShapeLike ShapeKind, DType DTypeKind, Device DeviceKind,
+		  Layout LayoutKind>
+class Tensor : public detail::TensorBase
+{
+public:
+	using shape = ShapeKind;
+	static constexpr inline DType dtype{DTypeKind};
+	static constexpr inline Device device{DeviceKind};
+	static constexpr inline Layout layout{LayoutKind};
+	using detail::TensorBase::unsafe_raw;
+	using detail::TensorBase::unwrap;
+
+	Tensor() = delete;
+	Tensor(Tensor const &) = delete;
+	auto operator=(Tensor const &) -> Tensor & = delete;
+
+	inline Tensor(Tensor &&) noexcept = default;
+	inline auto operator=(Tensor &&) noexcept -> Tensor & = default;
+
+	[[nodiscard]] static inline auto retain(::at::Tensor const &raw) -> Tensor
+	{
+		detail::check_tensor_compatible_runtime(raw, shape::dims, dtype, device,
+												layout);
+		return unsafe_retain(raw);
+	}
+
+	[[nodiscard]] static inline auto unsafe_retain(::at::Tensor const &raw) noexcept
+		-> Tensor
+	{
+		::at::Tensor retained{raw};
+		return Tensor(::std::move(retained)); // get the copy of the raw
+	}
+
+	[[nodiscard]] static inline auto unsafe_move(::at::Tensor &&raw) noexcept -> Tensor
+	{
+		return Tensor(::std::move(raw));
+	}
+
+	[[nodiscard]] inline auto contiguous() const noexcept
+		requires(layout == Layout::Contiguous)
+
+	{
+		return *this;
+	}
+
+	[[nodiscard]] inline auto contiguous()
+		requires(layout != Layout::Contiguous)
+	{
+		using Result = Tensor<shape, dtype, device, Layout::Contiguous>;
+
+		return Result::unsafe_move(unsafe_raw().contiguous());
+	}
+
+	[[nodiscard]] inline auto relu() const
+	{
+		return unsafe_move(unsafe_raw().relu());
+	}
+	inline void relu_()
+	{
+		unsafe_raw().relu_();
+	}
+
+	[[nodiscard]] inline auto softmax(::std::int64_t const dim) const
+	{
+		static_assert(dtype == DType::Any || detail::is_floating_dtype(dtype),
+					  "Tensor::softmax() requires floating tensor dtype");
+		return unsafe_move(unsafe_raw().softmax(dim));
+	}
+
+	template <auto Dim>
+	[[nodiscard]] inline auto softmax(
+		::std::integral_constant<decltype(Dim), Dim>) const
+		requires(::std::integral<decltype(Dim)>)
+	{
+		static_assert(dtype == DType::Any || detail::is_floating_dtype(dtype),
+					  "Tensor::softmax() requires floating tensor dtype");
+		return unsafe_move(
+			unsafe_raw().softmax(static_cast<::std::int64_t>(Dim)));
+	}
+
+	template <TensorLike Other>
+	[[nodiscard]] inline auto add(Other const &other,
+								  ::at::Scalar const &alpha = 1) const
+	{
+		using OtherShape = typename Other::shape;
+		static_assert(BROADCAST_COMPATIBLE(shape, OtherShape),
+					  "tensor shapes are not broadcast-compatible");
+
+		using Result =
+			Tensor<BROADCAST_SHAPE_T(shape, OtherShape),
+				   common_dtype(dtype, Other::dtype),
+				   common_device(device, Other::device), Layout::Any>;
+		return Result::unsafe_move(unsafe_raw().add(other.unsafe_raw(), alpha));
+	}
+
+	[[nodiscard]] inline auto add(::at::Scalar const &other,
+								  ::at::Scalar const &alpha = 1) const
+	{
+		return unsafe_move(unsafe_raw().add(other, alpha));
+	}
+
+	template <TensorLike Other>
+	[[nodiscard]] inline auto sub(Other const &other,
+								  ::at::Scalar const &alpha = 1) const
+	{
+		using OtherShape = typename Other::shape;
+		static_assert(BROADCAST_COMPATIBLE(shape, OtherShape),
+					  "tensor shapes are not broadcast-compatible");
+
+		using Result =
+			Tensor<BROADCAST_SHAPE_T(shape, OtherShape),
+				   common_dtype(dtype, Other::dtype),
+				   common_device(device, Other::device), Layout::Any>;
+		return Result::unsafe_move(unsafe_raw().sub(other.unsafe_raw(), alpha));
+	}
+
+	[[nodiscard]] inline auto sub(::at::Scalar const &other,
+								  ::at::Scalar const &alpha = 1) const
+	{
+		return unsafe_move(unsafe_raw().sub(other, alpha));
+	}
+
+	template <TensorLike Other>
+	[[nodiscard]] inline auto mul(Other const &other) const
+	{
+		using OtherShape = typename Other::shape;
+		static_assert(BROADCAST_COMPATIBLE(shape, OtherShape),
+					  "tensor shapes are not broadcast-compatible");
+
+		using Result =
+			Tensor<BROADCAST_SHAPE_T(shape, OtherShape),
+				   common_dtype(dtype, Other::dtype),
+				   common_device(device, Other::device), Layout::Any>;
+		return Result::unsafe_move(unsafe_raw().mul(other.unsafe_raw()));
+	}
+
+	[[nodiscard]] inline auto mul(::at::Scalar const &other) const
+	{
+		return unsafe_move(unsafe_raw().mul(other));
+	}
+
+	template <TensorLike Other>
+	[[nodiscard]] inline auto div(Other const &other) const
+	{
+		using OtherShape = typename Other::shape;
+		static_assert(BROADCAST_COMPATIBLE(shape, OtherShape),
+					  "tensor shapes are not broadcast-compatible");
+
+		using Result =
+			Tensor<BROADCAST_SHAPE_T(shape, OtherShape),
+				   common_dtype(dtype, Other::dtype),
+				   common_device(device, Other::device), Layout::Any>;
+		return Result::unsafe_move(unsafe_raw().div(other.unsafe_raw()));
+	}
+
+	[[nodiscard]] inline auto div(::at::Scalar const &other) const
+	{
+		return unsafe_move(unsafe_raw().div(other));
+	}
+
+	template <TensorLike Other>
+	[[nodiscard]] inline auto matmul(Other const &other) const
+	{
+		using OtherShape = typename Other::shape;
+		using Result =
+			Tensor<MATMUL_SHAPE_T(shape, OtherShape),
+				   common_dtype(dtype, Other::dtype),
+				   common_device(device, Other::device), Layout::Any>;
+		return Result::unsafe_move(unsafe_raw().matmul(other.unsafe_raw()));
+	}
+
+	template <::std::int64_t Dim0, ::std::int64_t Dim1>
+	[[nodiscard]] inline auto transpose() &&
+	{
+		using Result =
+			Tensor<TRANSPOSE_SHAPE_T(shape, Dim0, Dim1), dtype, device,
+				   ::tenspec::detail::transpose_layout(layout, shape::dims, Dim0,
+													   Dim1)>;
+		return Result::unsafe_move(unsafe_raw().transpose(Dim0, Dim1));
+	}
+
+	template <::std::int64_t... Dims>
+	[[nodiscard]] inline auto permute() &&
+	{
+		constexpr ::std::int64_t dims[]{Dims...};
+		using Result = Tensor<PERMUTE_SHAPE_T(shape, dims), dtype, device,
+							  PERMUTE_LAYOUT(shape, layout, dims)>;
+		return Result::unsafe_move(
+			unsafe_raw().permute(dims));
+	}
+
+	template <::std::int64_t... Dims>
+	[[nodiscard]] inline auto view() &&
+	{
+		detail::check_contiguous_compiletime(layout);
+
+		constexpr ::std::int64_t dims[]{Dims...};
+		using Result = Tensor<VIEW_SHAPE_T(shape, dims), dtype, device,
+							  Layout::Contiguous>;
+		return Result::unsafe_move(
+			unsafe_raw().view(dims));
+	}
+
+	template <::std::int64_t... Dims>
+	[[nodiscard]] inline auto reshape() &&
+		requires(layout == Layout::Contiguous)
+	{
+		return view<Dims...>();
+	}
+	template <::std::int64_t... Dims>
+	[[nodiscard]] inline auto reshape() &&
+		requires(layout != Layout::Contiguous)
+	{
+		return contiguous().template view<Dims...>();
+	}
+
+	template <::std::int64_t StartDim = 0, ::std::int64_t EndDim = -1>
+	[[nodiscard]] inline auto flatten() const
+	{
+		using Result = Tensor<FLATTEN_SHAPE_T(shape, StartDim, EndDim), dtype,
+							  device,
+							  layout == Layout::Contiguous ? Layout::Contiguous
+														 : Layout::Any>;
+		return Result::unsafe_move(unsafe_raw().flatten(StartDim, EndDim));
+	}
+
+	[[nodiscard]] inline auto squeeze() const
+	{
+		using Result = Tensor<SQUEEZE_SHAPE_T(shape), dtype, device, layout>;
+		return Result::unsafe_move(unsafe_raw().squeeze());
+	}
+
+	template <::std::int64_t Dim>
+	[[nodiscard]] inline auto squeeze() const
+	{
+		using Result = Tensor<SQUEEZE_DIM_SHAPE_T(shape, Dim), dtype, device,
+							  layout>;
+		return Result::unsafe_move(unsafe_raw().squeeze(Dim));
+	}
+
+	template <::std::int64_t Dim>
+	[[nodiscard]] inline auto unsqueeze() const
+	{
+		using Result = Tensor<UNSQUEEZE_SHAPE_T(shape, Dim), dtype, device,
+							  layout>;
+		return Result::unsafe_move(unsafe_raw().unsqueeze(Dim));
+	}
+
+	template <TensorLike Mask>
+	[[nodiscard]] inline auto masked_fill(Mask const &mask,
+										  ::at::Scalar const &value) const
+	{
+		using MaskShape = typename Mask::shape;
+		static_assert(Mask::dtype == DType::Any || Mask::dtype == DType::Bool,
+					  "Tensor::masked_fill() requires a bool mask tensor");
+		static_assert(BROADCAST_COMPATIBLE(shape, MaskShape),
+					  "mask shape is not broadcast-compatible");
+		using Result = Tensor<shape, dtype, common_device(device, Mask::device),
+							  Layout::Any>;
+		return Result::unsafe_move(unsafe_raw().masked_fill(mask.unsafe_raw(), value));
+	}
+
+	template <TensorLike Mask>
+	[[nodiscard]] inline auto mask_fill(Mask const &mask,
+								 ::at::Scalar const &value) const
+	{
+		return masked_fill(mask, value);
+	}
+
+	template <TensorLike Condition, TensorLike X, TensorLike Y>
+	[[nodiscard]] static inline auto where(Condition const &condition, X const &x,
+										   Y const &y)
+	{
+		using ConditionShape = typename Condition::shape;
+		using XShape = typename X::shape;
+		using YShape = typename Y::shape;
+		static_assert(Condition::dtype == DType::Any || Condition::dtype == DType::Bool,
+					  "Tensor::where() requires a bool condition tensor");
+		static_assert(BROADCAST_COMPATIBLE(XShape, YShape),
+					  "where value tensor shapes are not broadcast-compatible");
+		using ValueShape = BROADCAST_SHAPE_T(XShape, YShape);
+		static_assert(BROADCAST_COMPATIBLE(ValueShape, ConditionShape),
+					  "where condition shape is not broadcast-compatible");
+		using Result = Tensor<BROADCAST_SHAPE_T(ValueShape, ConditionShape),
+							  common_dtype(X::dtype, Y::dtype),
+							  common_device(common_device(X::device, Y::device),
+											Condition::device),
+							  Layout::Any>;
+		return Result::unsafe_move(
+			::at::where(condition.unsafe_raw(), x.unsafe_raw(), y.unsafe_raw()));
+	}
+
+	template <Device ndevice, DType ndtype = dtype>
+	[[nodiscard]] inline auto to() &&
+	{
+		return Tensor<shape, ndtype, ndevice, layout>::unsafe_move(unsafe_raw().to(::at::TensorOptions{}.dtype(detail::to_aten_dtype(ndtype)).device(detail::to_aten_device(ndevice))));
+	};
+	template <DType ndtype>
+	[[nodiscard]] inline auto to() &&
+	{
+		return Tensor<shape, ndtype, device, layout>::unsafe_move(unsafe_raw().to(::at::TensorOptions{}.dtype(detail::to_aten_dtype(ndtype))));
+	};
+
+	[[nodiscard]] static inline auto empty() -> Tensor
+	{
+		static_assert(!shape::dynamic_rank,
+					  "Tensor::empty() requires a fully static shape");
+
+		check_factory_layout_compiletime();
+		return unsafe_move(::at::empty(shape::dims, factory_options));
+	}
+
+	[[nodiscard]] static inline auto zeros() -> Tensor
+	{
+		static_assert(!shape::dynamic_rank,
+					  "Tensor::zeros() requires a fully static shape");
+
+		check_factory_layout_compiletime();
+		return unsafe_move(::at::zeros(shape::dims, factory_options));
+	}
+
+	[[nodiscard]] static inline auto ones() -> Tensor
+	{
+		static_assert(!shape::dynamic_rank,
+					  "Tensor::ones() requires a fully static shape");
+
+		check_factory_layout_compiletime();
+		return unsafe_move(::at::ones(shape::dims, factory_options));
+	}
+
+	[[nodiscard]] static inline auto rand() -> Tensor
+	{
+		static_assert(!shape::dynamic_rank,
+					  "Tensor::rand() requires a fully static shape");
+
+		check_factory_layout_compiletime();
+		return unsafe_move(::at::rand(shape::dims, factory_options));
+	}
+
+	[[nodiscard]] static inline auto randn() -> Tensor
+	{
+		static_assert(!shape::dynamic_rank,
+					  "Tensor::randn() requires a fully static shape");
+
+		check_factory_layout_compiletime();
+		return unsafe_move(::at::randn(shape::dims, factory_options));
+	}
+
+
+	[[nodiscard]] inline auto checked_wrap(::at::Tensor const &raw)
+
+	{
+		return retain(raw);
+	}
+
+	[[nodiscard]] inline auto unsafe_wrap(::at::Tensor const &raw) noexcept
+
+	{
+		return unsafe_retain(raw);
+	}
+
+	[[nodiscard]] inline auto unsafe_wrap(::at::Tensor &&raw) noexcept
+
+	{
+		return unsafe_move(raw);
+	}
+
+	[[nodiscard]] inline auto clone() const
+	{
+		return unsafe_move(this->unsafe_raw().clone());
+	}
+	// static method -> factory_options
+	static inline ::at::TensorOptions const factory_options{
+		::at::TensorOptions{}
+			.dtype(detail::to_aten_dtype(dtype))
+			.device(detail::to_aten_device(device))};
+
+	[[nodiscard]] inline auto operator>(::at::Scalar const &other) const
+	{
+		using Result = Tensor<shape, DType::Bool, device, layout>;
+		return Result::unsafe_move(::at::gt(unsafe_raw(), other));
+	}
+
+private:
+	consteval static inline void check_factory_layout_compiletime() noexcept
+	{
+		static_assert(layout != Layout::NonContiguous,
+					  "Tensor factory functions create contiguous tensors");
+	}
+
+	[[nodiscard]] static inline auto checked_move(::at::Tensor raw) -> Tensor
+	{
+		detail::check_tensor_compatible_runtime(raw, shape::dims, dtype, device,
+												layout);
+		return unsafe_move(::std::move(raw));
+	}
+
+	inline explicit Tensor(::at::Tensor raw) noexcept
+		: detail::TensorBase{::std::move(raw)}
+	{}
+};
+
+} // namespace tenspec

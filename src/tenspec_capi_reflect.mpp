@@ -1,0 +1,340 @@
+export module tenspec.capi_reflect;
+
+import std;
+import libtorch;
+import python;
+import tenspec;
+import tenspec.capi_bridge;
+import tenspec.examples;
+
+namespace tenspec_capi::reflect
+{
+
+template <typename T>
+inline constexpr bool string_like_v =
+	::std::is_same_v<::std::remove_cvref_t<T>, ::std::string> ||
+	::std::is_same_v<::std::remove_cvref_t<T>, ::std::string_view> ||
+	::std::is_same_v<::std::remove_cvref_t<T>, char const *> ||
+	::std::is_same_v<::std::remove_cvref_t<T>, char *>;
+
+template <typename Arg>
+using parsed_arg_t = ::std::remove_cvref_t<Arg>;
+
+// don't forget to remove cvref before calling it!
+// TODO: Wating for pattern matching
+template <typename Arg>
+inline auto parse_arg(python::PyObject *object, ::std::size_t index)
+	-> ::std::optional<parsed_arg_t<Arg>>
+{
+	if constexpr (tenspec::TensorLike<Arg>)
+	{
+		if (!python::tensor_check(object))
+		{
+			python::PyErr_Format(python::type_error(),
+								 "argument %lu must be a torch.Tensor",
+								 static_cast<unsigned long>(index));
+			return ::std::nullopt;
+		}
+		return Arg::retain(python::THPVariable_Unpack(object));
+	}
+	else if constexpr (::std::is_same_v<Arg, ::at::Tensor>)
+	{
+		if (!python::tensor_check(object))
+		{
+			python::PyErr_Format(python::type_error(),
+								 "argument %lu must be a torch.Tensor",
+								 static_cast<unsigned long>(index));
+			return ::std::nullopt;
+		}
+		return python::THPVariable_Unpack(object);
+	}
+	else if constexpr (::std::is_same_v<Arg, bool>)
+	{
+		auto value{python::PyObject_IsTrue(object)};
+		if (value < 0)
+		{
+			return ::std::nullopt;
+		}
+		return value != 0;
+	}
+	else if constexpr (::std::is_integral_v<Arg> && ::std::is_signed_v<Arg>)
+	{
+		auto value{python::PyLong_AsLongLong(object)};
+		if (value == -1 && python::PyErr_Occurred())
+		{
+			python::PyErr_Format(python::type_error(),
+								 "argument %lu must be an integer",
+								 static_cast<unsigned long>(index));
+			return ::std::nullopt;
+		}
+		return static_cast<Arg>(value);
+	}
+	else if constexpr (::std::is_integral_v<Arg> && ::std::is_unsigned_v<Arg>)
+	{
+		auto value{python::PyLong_AsUnsignedLongLong(object)};
+		if (value == static_cast<unsigned long long>(-1) &&
+			python::PyErr_Occurred())
+		{
+			python::PyErr_Format(python::type_error(),
+								 "argument %lu must be a non-negative integer",
+								 static_cast<unsigned long>(index));
+			return ::std::nullopt;
+		}
+		return static_cast<Arg>(value);
+	}
+	else if constexpr (::std::is_floating_point_v<Arg>)
+	{
+		auto value{python::PyFloat_AsDouble(object)};
+		if (value == -1.0 && python::PyErr_Occurred())
+		{
+			python::PyErr_Format(python::type_error(),
+								 "argument %lu must be a floating-point number",
+								 static_cast<unsigned long>(index));
+			return ::std::nullopt;
+		}
+		return static_cast<Arg>(value);
+	}
+	else if constexpr (::std::is_same_v<Arg, ::std::string_view>)
+	{
+		python::Py_ssize_t size{};
+		auto *data{python::PyUnicode_AsUTF8AndSize(object, &size)};
+		if (!data)
+		{
+			python::PyErr_Format(python::type_error(), "argument %lu must be a string",
+								 static_cast<unsigned long>(index));
+			return ::std::nullopt;
+		}
+		return ::std::string_view{data, static_cast<::std::size_t>(size)};
+	}
+	else if constexpr (::std::is_same_v<Arg, ::std::string>)
+	{
+		python::Py_ssize_t size{};
+		auto *data{python::PyUnicode_AsUTF8AndSize(object, &size)};
+		if (!data)
+		{
+			python::PyErr_Format(python::type_error(), "argument %lu must be a string",
+								 static_cast<unsigned long>(index));
+			return ::std::nullopt;
+		}
+		return ::std::string{data, static_cast<::std::size_t>(size)};
+	}
+	else if constexpr (::std::is_same_v<Arg, char const *>)
+	{
+		python::Py_ssize_t size{};
+		auto *data{python::PyUnicode_AsUTF8AndSize(object, &size)};
+		if (!data)
+		{
+			python::PyErr_Format(python::type_error(), "argument %lu must be a string",
+								 static_cast<unsigned long>(index));
+			return ::std::nullopt;
+		}
+		return data;
+	}
+	else
+	{
+		static_assert(false, "Unsupported reflected Python argument");
+	}
+}
+#define PARSE_ARG(Arg, object, index) \
+	parse_arg<::std::remove_cvref_t<Arg>>((object), (index))
+
+
+template <::std::size_t Index, typename... Args>
+inline auto parse_tuple_impl(
+	python::PyObject *args,
+	::std::tuple<::std::optional<parsed_arg_t<Args>>...> &parsed) -> bool
+{
+	if constexpr (Index == sizeof...(Args))
+	{
+		return true;
+	}
+	else
+	{
+		using Arg = ::std::tuple_element_t<Index, ::std::tuple<Args...>>;
+		auto value{PARSE_ARG(Arg,
+							 python::tuple_get_item(args, static_cast<python::Py_ssize_t>(Index)),
+							 Index)};
+		if (!value)
+		{
+			return false;
+		}
+		::std::get<Index>(parsed) = ::std::move(value);
+		return parse_tuple_impl<Index + 1, Args...>(args, parsed);
+	}
+}
+
+template <typename... Args>
+inline auto parse_tuple(python::PyObject *args)
+	-> ::std::optional<::std::tuple<parsed_arg_t<Args>...>>
+{
+	::std::tuple<::std::optional<parsed_arg_t<Args>>...> parsed;
+	if (!parse_tuple_impl<0, Args...>(args, parsed))
+	{
+		return ::std::nullopt;
+	}
+
+	return ::std::apply(
+		[]<typename... Parsed>(::std::optional<Parsed> &...values)
+			-> ::std::optional<::std::tuple<parsed_arg_t<Args>...>> {
+			return ::std::tuple<parsed_arg_t<Args>...>{
+				::std::move(*values)...};
+		},
+		parsed);
+}
+
+template <typename Arg, typename Parsed>
+inline auto forward_parsed(Parsed &value) -> decltype(auto)
+{
+	if constexpr (::std::is_lvalue_reference_v<Arg>)
+	{
+		return static_cast<Arg>(value);
+	}
+	else
+	{
+		return ::std::move(value);
+	}
+}
+
+template <typename Result>
+inline auto to_python(Result &&result) -> python::PyObject *
+{
+	using Bare = ::std::remove_cvref_t<Result>;
+	if constexpr (tenspec::TensorLike<Bare>)
+	{
+		return python::THPVariable_Wrap(::std::move(result).unwrap());
+	}
+	else if constexpr (::std::is_same_v<Bare, ::at::Tensor>)
+	{
+		return python::THPVariable_Wrap(::std::forward<Result>(result));
+	}
+	else if constexpr (::std::is_same_v<Bare, bool>)
+	{
+		return python::PyBool_FromLong(result ? 1 : 0);
+	}
+	else if constexpr (::std::is_integral_v<Bare> && ::std::is_signed_v<Bare>)
+	{
+		return python::PyLong_FromLongLong(static_cast<long long>(result));
+	}
+	else if constexpr (::std::is_integral_v<Bare> && ::std::is_unsigned_v<Bare>)
+	{
+		return python::PyLong_FromUnsignedLongLong(
+			static_cast<unsigned long long>(result));
+	}
+	else if constexpr (::std::is_floating_point_v<Bare>)
+	{
+		return python::PyFloat_FromDouble(static_cast<double>(result));
+	}
+	else if constexpr (::std::is_same_v<Bare, ::std::string> ||
+					   ::std::is_same_v<Bare, ::std::string_view>)
+	{
+		return python::PyUnicode_FromStringAndSize(
+			result.data(), static_cast<python::Py_ssize_t>(result.size()));
+	}
+	else if constexpr (::std::is_same_v<Bare, char const *> ||
+					   ::std::is_same_v<Bare, char *>)
+	{
+		return python::PyUnicode_FromStringAndSize(
+			result ? result : "", static_cast<python::Py_ssize_t>(
+									  result ? ::std::char_traits<char>::length(result)
+											 : 0));
+	}
+	else
+	{
+		static_assert(false, "Unsupported reflected Python result");
+	}
+}
+
+template <auto Function, typename Return, typename... Args, ::std::size_t... Index>
+inline auto invoke_impl(::std::tuple<parsed_arg_t<Args>...> &args,
+						::std::index_sequence<Index...>)
+	-> python::PyObject *
+{
+	if constexpr (::std::is_void_v<Return>)
+	{
+		Function(forward_parsed<Args>(::std::get<Index>(args))...);
+		return python::none();
+	}
+	else
+	{
+		return to_python(Function(forward_parsed<Args>(::std::get<Index>(args))...));
+	}
+}
+
+template <auto Function, typename Return, typename... Args>
+inline auto invoke_dispatch(Return (*)(Args...), python::PyObject *args) noexcept
+	-> python::PyObject *
+{
+	if (!python::tuple_check(args) ||
+		python::tuple_size(args) != static_cast<python::Py_ssize_t>(sizeof...(Args)))
+	{
+		python::PyErr_Format(python::type_error(),
+							 "expected %lu positional arguments",
+							 static_cast<unsigned long>(sizeof...(Args)));
+		return nullptr;
+	}
+
+	auto parsed{parse_tuple<Args...>(args)};
+	if (!parsed)
+	{
+		return nullptr;
+	}
+
+	return invoke_impl<Function, Return, Args...>(
+		*parsed, ::std::index_sequence_for<Args...>{});
+}
+
+template <auto Function, typename Return, typename... Args>
+inline auto invoke_dispatch(Return (*)(Args...) noexcept, python::PyObject *args) noexcept
+	-> python::PyObject *
+{
+	return invoke_dispatch<Function>(static_cast<Return (*)(Args...)>(Function),
+									 args);
+}
+
+template <auto Function>
+inline auto invoke(python::PyObject *, python::PyObject *args) noexcept -> python::PyObject *
+{
+	return invoke_dispatch<Function>(Function, args);
+}
+
+template <auto Function>
+inline void visit_function(char const *name, tenspec_python_visit_fn visit,
+						   void *user) noexcept
+{
+	tenspec_python_function function{
+		.name = name,
+		.doc = nullptr,
+		.invoke = invoke<Function>,
+	};
+	visit(&function, user);
+}
+
+consteval inline auto members_of_namespace(::std::meta::info Namespace) noexcept
+{
+	constexpr auto context{::std::meta::access_context::unchecked()};
+	return ::std::define_static_array(
+		::std::meta::members_of(Namespace, context));
+}
+
+} // namespace tenspec_capi::reflect
+
+extern "C" void tenspec_python_for_each_function(tenspec_python_visit_fn visit,
+												 void *user) noexcept
+{
+	if (!visit)
+	{
+		return;
+	}
+
+	static constexpr auto members{
+		::tenspec_capi::reflect::members_of_namespace(^^tenspec_examples)};
+	template for (constexpr auto member : members)
+	{
+		if constexpr (::std::meta::is_function(member))
+		{
+			::std::string name{::std::meta::identifier_of(member)};
+			::tenspec_capi::reflect::visit_function<([:member:])>(name.c_str(), visit,
+																  user);
+		}
+	}
+}

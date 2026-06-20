@@ -1,0 +1,15 @@
+.venv/
+build/
+.xmake/
+compile_commands.json
+*.so
+*.dylib
+*.dll
+__pycache__/
+.pytest_cache/
+.vscode/
+ignore.txt
+gcm.cache/
+.cache/
+backups/
+error.log

@@ -1,0 +1,31 @@
+export module tenspec:aten_mappings;
+
+import std;
+import libtorch;
+export import :types;
+
+export namespace tenspec
+{
+
+namespace detail
+{
+
+constexpr inline ::std::array<::at::ScalarType, 6> aten_dtype_map{
+	::at::kFloat, ::at::kFloat, ::at::kHalf, ::at::kBFloat16, ::at::kLong, ::at::kBool};
+
+constexpr inline ::std::array<c10::DeviceType, 3> aten_device_map{
+	c10::DeviceType::CPU, c10::DeviceType::CPU, c10::DeviceType::CUDA};
+
+consteval inline auto to_aten_dtype(DType dtype) noexcept -> ::at::ScalarType
+{
+	return aten_dtype_map[static_cast<::std::size_t>(dtype)];
+}
+
+consteval inline auto to_aten_device(Device device) noexcept -> c10::DeviceType
+{
+	return aten_device_map[static_cast<::std::size_t>(device)];
+}
+
+} // namespace detail
+
+} // namespace tenspec
