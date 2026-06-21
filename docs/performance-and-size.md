@@ -31,7 +31,7 @@ Probe roles:
 
 | Target | Role |
 | --- | --- |
-| `binary_size_libtorch_probe` | Native LibTorch baseline using only `at::Tensor`. |
+| `binary_size_libtorch_probe` | Native LibTorch baseline using only `torch::Tensor`. |
 | `binary_size_tensor_checked_probe` | Typetorch path where every raw tensor enters via `retain()` and pays runtime shape/dtype/device/layout checks. |
 | `binary_size_tensor_unsafe_probe` | Typetorch path where every raw tensor enters via `unsafe_retain()`; this models a trusted caller that guarantees the contract. |
 | `binary_size_tensor_probe` | Legacy mixed probe that uses both checked and unsafe retain paths; keep it only for old-result comparison. |
@@ -50,7 +50,7 @@ The executable prints lines like:
 operation, raw_ns=<raw>, typetorch_ns=<typed>, ratio=<typed/raw>
 ```
 
-Ratio is `Typetorch / raw at::Tensor`. A ratio close to `1.0` means the wrapper has
+Ratio is `Typetorch / raw torch::Tensor`. A ratio close to `1.0` means the wrapper has
 no measurable forwarding cost for that operation under the current build.
 
 Current snapshot, release build, CPU tensors, one thread, 1000 iterations:
@@ -110,7 +110,7 @@ Key summary rows:
 
 | Row | Meaning |
 | --- | --- |
-| `native_probe_functions` | Native `at::Tensor` helper functions. |
+| `native_probe_functions` | Native `torch::Tensor` helper functions. |
 | `checked_probe_functions` | Typetorch helper functions in the fully checked probe. |
 | `unsafe_probe_functions` | Typetorch helper functions in the fully unsafe probe. |
 | `checked_runtime_checks` | Runtime contract check symbols pulled in by `retain()`. |

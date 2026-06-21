@@ -2,8 +2,12 @@
 
 typetorch is built around one rule: LibTorch stays responsible for tensor
 storage, kernels, dispatch, autograd, and device behavior. typetorch adds a typed
-contract layer around `::at::Tensor` and tries to make the contract cheap enough
+contract layer around `::torch::Tensor` and tries to make the contract cheap enough
 that users can keep it in ordinary C++ code.
+
+The wrapper's public raw-tensor boundary uses the LibTorch C++ frontend namespace.
+`src/libtorch.mpp` re-exports the small `torch::` and `c10::` surface the project
+needs, so Typetorch code and examples stay on that public namespace.
 
 ## Typed Tensor Contract
 
@@ -19,14 +23,14 @@ The type parameters describe the contract:
 - `DType` records the expected scalar type.
 - `Device` records the expected device class.
 - `Layout` records whether the tensor is known contiguous, non-contiguous,
-  sparse, or layout-agnostic.
+  or layout-agnostic.
 
-The wrapper owns an `::at::Tensor` handle. It is move-only so moving back to raw
+The wrapper owns an `::torch::Tensor` handle. It is move-only so moving back to raw
 LibTorch is explicit:
 
 ```cpp
 auto typed = Matrix::retain(raw);
-::at::Tensor raw_again = ::std::move(typed).unwrap();
+::torch::Tensor raw_again = ::std::move(typed).unwrap();
 ```
 
 Use `retain()` at trust boundaries. It validates shape, dtype, device, and
@@ -83,6 +87,8 @@ The codebase uses C++26 modules to keep heavy dependencies controlled:
 
 - Core typetorch modules live in `src/typetorch_*.mpp`.
 - `src/libtorch.mpp` wraps LibTorch imports.
+- `src/typetorch_torch_mappings.mpp` maps Typetorch dtype/device enums to
+  LibTorch scalar and device types.
 - `bindings/python.mpp` wraps `Python.h` and torch Python C API headers.
 - `src/typetorch_capi_reflect.mpp` imports both the typed tensor modules and the
   Python module to generate wrappers.

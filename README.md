@@ -6,7 +6,11 @@ and lightweight Python C API bindings.
 The core wrapper carries tensor shape, dtype, device, and layout information in
 C++ types while forwarding runtime work to LibTorch. LibTorch still owns tensor
 storage, kernels, dispatch, autograd, and device behavior; Typetorch adds a typed
-contract layer around `at::Tensor`.
+contract layer around `torch::Tensor`.
+
+The public LibTorch-facing surface now uses the C++ frontend namespace
+(`torch::Tensor`, `torch::Scalar`, `torch::TensorOptions`, and `torch::*`
+factory functions).
 
 ## Status
 
@@ -84,7 +88,8 @@ For release measurements:
 xmake f -m release --yes --python="${PYTHON:-python3}"
 xmake build typetorch_forwarding_benchmark
 xmake build binary_size_libtorch_probe
-xmake build binary_size_tensor_probe
+xmake build binary_size_tensor_checked_probe
+xmake build binary_size_tensor_unsafe_probe
 ```
 
 ## API Sketch
@@ -98,21 +103,22 @@ using Matrix = typetorch::Tensor<
     typetorch::Device::CPU,
     typetorch::Layout::Contiguous>;
 
-at::Tensor raw = at::arange(6, options).view({2, 3});
+auto options = torch::TensorOptions{}.dtype(torch::kFloat).device(torch::kCPU);
+torch::Tensor raw = torch::arange(6, options).view({2, 3});
 auto typed = Matrix::retain(raw);        // runtime contract check
 auto flat = typed.flatten<>();           // result type is Shape<6>
-at::Tensor back = std::move(flat).unwrap();
+torch::Tensor back = std::move(flat).unwrap();
 ```
 
 Important differences from ordinary LibTorch code:
 
 | Topic | LibTorch | Typetorch |
 | --- | --- | --- |
-| Tensor type | Mostly dynamic `at::Tensor` metadata | Shape, dtype, device, and layout are part of the C++ type. |
+| Tensor type | Mostly dynamic `torch::Tensor` metadata | Shape, dtype, device, and layout are part of the C++ type. |
 | Shape errors | Usually runtime errors | Statically known shape mismatches fail during compilation. |
 | Dynamic dimensions | Tensor sizes are runtime values | `dyn` marks dimensions that remain runtime-checked. |
-| Ownership style | `at::Tensor` is copyable handle type | `Tensor<...>` is move-only; use `unwrap()` to recover raw LibTorch. |
-| Trust boundary | Any `at::Tensor` can flow anywhere | `retain()` validates raw tensors before they enter typed code. |
+| Ownership style | `torch::Tensor` is copyable handle type | `Tensor<...>` is move-only; use `unwrap()` to recover raw LibTorch. |
+| Trust boundary | Any `torch::Tensor` can flow anywhere | `retain()` validates raw tensors before they enter typed code. |
 | Layout | Runtime property | `Layout::Contiguous`, `Layout::NonContiguous`, or `Layout::Any` can be tracked. |
 
 See [docs/api.md](docs/api.md) for the supported operation style and the places
@@ -128,7 +134,7 @@ indicative, not as a stable benchmark promise.
 ### Forwarding Performance
 
 Release build, CPU tensors, 1 thread, 1000 iterations. Ratio is
-`Typetorch / raw at::Tensor`; values near 1.0 mean no measurable forwarding loss.
+`Typetorch / raw torch::Tensor`; values near 1.0 mean no measurable forwarding loss.
 
 | Operation | Raw ns/op | Typetorch ns/op | Ratio | Overhead |
 | --- | ---: | ---: | ---: | ---: |
@@ -146,7 +152,7 @@ interpretation:
 
 | Target | Role |
 | --- | --- |
-| `binary_size_libtorch_probe` | Native LibTorch baseline using only `at::Tensor`. |
+| `binary_size_libtorch_probe` | Native LibTorch baseline using only `torch::Tensor`. |
 | `binary_size_tensor_checked_probe` | Fully checked Typetorch boundary: raw tensors enter through `retain()`. |
 | `binary_size_tensor_unsafe_probe` | Fully trusted Typetorch boundary: raw tensors enter through `unsafe_retain()`. |
 | `binary_size_tensor_probe` | Legacy mixed probe; keep only for comparing older measurements. |

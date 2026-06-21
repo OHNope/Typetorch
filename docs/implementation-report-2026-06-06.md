@@ -6,9 +6,11 @@ This note summarizes the current modules-based implementation state.
 
 - Core tensor contracts live in `src/typetorch_types.mpp`,
   `src/typetorch_shape_meta.mpp`, and `src/typetorch_tensor.mpp`.
+- Dtype/device conversion helpers live in `src/typetorch_torch_mappings.mpp`.
 - Runtime compatibility checks are separated into
   `src/typetorch_runtime_checks.mpp`.
-- `src/libtorch.mpp` exports the small LibTorch surface used by the wrapper.
+- `src/libtorch.mpp` exports the small `torch::`/`c10::` LibTorch surface used
+  by the wrapper.
 - Python C API integration is split across `bindings/` and
   `src/typetorch_capi_reflect.mpp`.
 - Public API notes live in `docs/api.md`.

@@ -1,10 +1,15 @@
 # API Notes
 
-Typetorch wraps `at::Tensor` in a move-only type carrying a static tensor contract:
+Typetorch wraps `torch::Tensor` in a move-only type carrying a static tensor contract:
 
 ```cpp
 typetorch::Tensor<Shape, DType, Device, Layout>
 ```
+
+Raw tensor interop is expressed through the LibTorch C++ frontend namespace.
+User code should pass and receive `torch::Tensor` handles. Internally those
+handles still use the same LibTorch storage, dispatch, autograd, and device
+behavior.
 
 ## Contract Parameters
 
@@ -30,10 +35,10 @@ contract.
 Use `unwrap()` to move the raw tensor handle back out:
 
 ```cpp
-at::Tensor raw = std::move(typed).unwrap();
+torch::Tensor raw = std::move(typed).unwrap();
 ```
 
-`Tensor<...>` is move-only. This is intentionally different from `at::Tensor`,
+`Tensor<...>` is move-only. This is intentionally different from `torch::Tensor`,
 which is a copyable handle.
 
 ## Operation Style
@@ -47,6 +52,9 @@ auto y = x.matmul(w);
 auto t = std::move(x).transpose<0, 1>();
 auto v = std::move(x).view<batch, hidden>();
 ```
+
+Factory functions and free/static operations follow the same convention:
+Typetorch wrappers call the `torch::` C++ frontend surface for typed API calls.
 
 Operations with dimensions that should be known statically use template
 parameters, not runtime integers:
@@ -89,7 +97,7 @@ of a contiguous tensor, the result type should keep that information.
 | Runtime dimensions | All dimensions are runtime metadata | Known dimensions live in the type; `dyn` is explicit. |
 | Runtime validation | Usually implicit inside kernels | `retain()` validates at typed boundaries. |
 | Dimension arguments | Mostly runtime `int64_t` | Many shape-changing ops use template dimensions. |
-| Tensor copying | `at::Tensor` is a copyable reference-counted handle | `Tensor<...>` is move-only to keep boundary transitions explicit. |
+| Tensor copying | `torch::Tensor` is a copyable reference-counted handle | `Tensor<...>` is move-only to keep boundary transitions explicit. |
 | Raw access | Raw tensor is the primary API | `unsafe_raw()` is available, but typed functions should preserve contracts. |
 
 ## Current Operation Coverage
