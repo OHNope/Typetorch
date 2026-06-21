@@ -13,3 +13,4 @@ gcm.cache/
 .cache/
 backups/
 error.log
+.temp_env/
