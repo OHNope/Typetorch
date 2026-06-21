@@ -3,6 +3,7 @@ export module typetorch.capi_reflect;
 import std;
 import libtorch;
 import python;
+import torch_python;
 import typetorch;
 import typetorch.capi_bridge;
 import typetorch.examples;
@@ -28,25 +29,25 @@ inline auto parse_arg(python::PyObject *object, ::std::size_t index)
 {
 	if constexpr (typetorch::TensorLike<Arg>)
 	{
-		if (!python::tensor_check(object))
+		if (!torch_python::tensor_check(object))
 		{
 			python::PyErr_Format(python::type_error(),
 								 "argument %lu must be a torch.Tensor",
 								 static_cast<unsigned long>(index));
 			return ::std::nullopt;
 		}
-		return Arg::retain(python::THPVariable_Unpack(object));
+		return Arg::retain(torch_python::tensor_unpack(object));
 	}
 	else if constexpr (::std::is_same_v<Arg, ::torch::Tensor>)
 	{
-		if (!python::tensor_check(object))
+		if (!torch_python::tensor_check(object))
 		{
 			python::PyErr_Format(python::type_error(),
 								 "argument %lu must be a torch.Tensor",
 								 static_cast<unsigned long>(index));
 			return ::std::nullopt;
 		}
-		return python::THPVariable_Unpack(object);
+		return torch_python::tensor_unpack(object);
 	}
 	else if constexpr (::std::is_same_v<Arg, bool>)
 	{
@@ -201,11 +202,11 @@ inline auto to_python(Result &&result) -> python::PyObject *
 	using Bare = ::std::remove_cvref_t<Result>;
 	if constexpr (typetorch::TensorLike<Bare>)
 	{
-		return python::THPVariable_Wrap(::std::move(result).unwrap());
+		return torch_python::tensor_wrap(::std::move(result).unwrap());
 	}
 	else if constexpr (::std::is_same_v<Bare, ::torch::Tensor>)
 	{
-		return python::THPVariable_Wrap(::std::forward<Result>(result));
+		return torch_python::tensor_wrap(::std::forward<Result>(result));
 	}
 	else if constexpr (::std::is_same_v<Bare, bool>)
 	{

@@ -14,3 +14,6 @@ gcm.cache/
 backups/
 error.log
 .temp_env/
+AGENTS.md
+scripts/env.local.sh
+typetorch.local.lua

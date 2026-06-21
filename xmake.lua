@@ -3,17 +3,80 @@ set_version("0.1.0")
 set_languages("c++26")
 set_policy("build.c++.modules.gcc.cxx11abi", true)
 
-local gcc_relocate_ldflags = os.getenv("TYPETORCH_GCC_RELOCATE_LDFLAGS")
+local local_config = {}
+
+function typetorch_config(config)
+    local_config = config or {}
+end
+
+if os.isfile("typetorch.local.lua") then
+    includes("typetorch.local.lua")
+end
+
+local function config_value(name, env_name)
+    local env_value = os.getenv(env_name or name)
+    if env_value and env_value ~= "" then
+        return env_value
+    end
+    local value = local_config[name]
+    if value ~= nil and value ~= "" then
+        return value
+    end
+    return nil
+end
+
+local function detect_gcc_relocate_ldflags()
+    local configured_flags = config_value("gcc_relocate_ldflags", "TYPETORCH_GCC_RELOCATE_LDFLAGS")
+    if configured_flags then return configured_flags end
+
+    local candidates = {}
+    local gcc_root = config_value("gcc_root", "GCC_ROOT")
+    local configured_toolchain = config_value("gcc_toolchain_root", "GCC_TOOLCHAIN_ROOT")
+    if configured_toolchain then
+        table.insert(candidates, configured_toolchain)
+    end
+    if gcc_root and gcc_root ~= "" then
+        local triplet = config_value("gcc_triplet", "GCC_TRIPLET") or "x86_64-focal-linux-gnu"
+        table.insert(candidates, path.join(path.directory(gcc_root), "x-tools", triplet))
+    end
+
+    for _, root in ipairs(candidates) do
+        local triplet = config_value("gcc_triplet", "GCC_TRIPLET") or "x86_64-focal-linux-gnu"
+        local version = config_value("gcc_version", "GCC_VERSION") or "16.1.0"
+        local frontend_dir = path.join(root, "libexec", "gcc", triplet, version)
+        local gcc_lib_dir = path.join(root, "lib", "gcc", triplet, version)
+        local sysroot = config_value("gcc_sysroot", "GCC_SYSROOT") or path.join(root, triplet, "sysroot")
+        if os.isfile(path.join(frontend_dir, "cc1plus")) and
+           os.isfile(path.join(gcc_lib_dir, "crtbeginS.o")) and
+           os.isfile(path.join(sysroot, "usr", "lib", "crti.o")) then
+            return format("-B%s/ -B%s/ -B%s/ -B%s/ --sysroot=%s",
+                          frontend_dir,
+                          gcc_lib_dir,
+                          path.join(sysroot, "usr", "lib"),
+                          path.join(sysroot, "lib"),
+                          sysroot)
+        end
+    end
+    return nil
+end
+
+local gcc_relocate_ldflags = detect_gcc_relocate_ldflags()
 if gcc_relocate_ldflags and gcc_relocate_ldflags ~= "" then
     for flag in gcc_relocate_ldflags:gmatch("%S+") do
         add_ldflags(flag, {force = true})
+        add_shflags(flag, {force = true})
     end
 end
 
 add_rules("mode.debug", "mode.release")
 add_repositories("local-repo .")
 add_cxxflags("-fmodules", "-freflection", "-Wall"," -Wextra","-fvisibility=hidden", {force = true})
-add_cxxflags("-isystem/usr/include/python3.9", {force = true})
+
+local configured_python_include = config_value("python_include_dir", "PYTHON_INCLUDE_DIR")
+if configured_python_include then
+    add_cxxflags("-isystem" .. configured_python_include, {force = true})
+    add_sysincludedirs(configured_python_include)
+end
 
 add_requires("libtorch-bin 2.8.0+cu128", {alias = "libtorch"})
 
@@ -276,6 +339,7 @@ target("typetorch_capi_ext")
     add_packages("libtorch")
     add_links("torch_python")
     add_files("bindings/python.mpp")
+    add_files("bindings/torch_python.mpp")
     add_files("bindings/capi_bridge.mpp")
     add_files("bindings/capi_module.cpp")
     add_files("src/fast_io.mpp", "src/fast_io.cpp")

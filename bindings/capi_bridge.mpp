@@ -1,15 +1,15 @@
 export module typetorch.capi_bridge;
 
-import python;
-
 export extern "C"
 {
+	struct _object;
+	using typetorch_python_invoke_fn = _object *(*)(_object *, _object *);
 
 	struct typetorch_python_function
 	{
 		char const *name{};
 		char const *doc{};
-		python::PyCFunction invoke{};
+		typetorch_python_invoke_fn invoke{};
 	};
 
 	using typetorch_python_visit_fn = void (*)(typetorch_python_function const *function,

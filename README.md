@@ -31,15 +31,48 @@ Minimum practical requirements:
 | Python runtime | Python with `torch` installed | Required only to import and exercise the extension. |
 | OS/tooling | Linux, `nm`, `size`, common binutils | Measurement scripts assume Unix-like tooling. |
 
-The repository does not hard-code a machine layout. If GCC or xmake is not on
-`PATH`, set these optional variables before sourcing `scripts/env.sh`:
+The repository does not hard-code a machine layout. Put machine-specific paths
+in local config files that are ignored by git:
+
+```bash
+cp scripts/env.local.example.sh scripts/env.local.sh
+cp typetorch.local.example.lua typetorch.local.lua
+```
+
+`scripts/env.sh` automatically sources `scripts/env.local.sh` when it exists.
+`xmake.lua` automatically includes `typetorch.local.lua` when it exists.
+
+Use `scripts/env.local.sh` for shell environment setup:
 
 ```bash
 export GCC_ROOT=/path/to/gcc-16.1-or-newer
-export GCC_RUNTIME_LIB=/path/to/gcc/runtime/lib64   # optional
+export GCC_TOOLCHAIN_ROOT=/path/to/x-tools/x86_64-focal-linux-gnu  # optional
+export GCC_TRIPLET=x86_64-focal-linux-gnu                         # optional
+export GCC_VERSION=16.1.0                                         # optional
+export GCC_SYSROOT=/path/to/sysroot                               # optional
+export GCC_RUNTIME_LIB=/path/to/gcc/runtime/lib64                 # optional
 export XMAKE_ROOT=/path/to/xmake-prefix             # optional
 export PYTHON=/path/to/python                       # optional
 ```
+
+Use `typetorch.local.lua` for xmake-only configuration:
+
+```lua
+typetorch_config({
+    gcc_root = "/path/to/gcc-prefix",
+    gcc_toolchain_root = "/path/to/x-tools/x86_64-focal-linux-gnu",
+    gcc_triplet = "x86_64-focal-linux-gnu",
+    gcc_version = "16.1.0",
+    gcc_sysroot = "/path/to/x-tools/x86_64-focal-linux-gnu/x86_64-focal-linux-gnu/sysroot",
+    python_include_dir = "/path/to/python/include",
+})
+```
+
+If your GCC driver cannot find startup objects such as `crti.o` or
+`crtbeginS.o`, set `gcc_toolchain_root`/`gcc_sysroot` or the equivalent
+environment variables above. As an escape hatch, `gcc_relocate_ldflags` or
+`TYPETORCH_GCC_RELOCATE_LDFLAGS` may contain the exact `-B... --sysroot=...`
+flags for your installation.
 
 ## Build From Scratch
 

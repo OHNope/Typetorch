@@ -8,7 +8,7 @@ namespace
 ::torch::Tensor tensor(::std::initializer_list<float> values)
 {
 	auto options{::torch::TensorOptions().dtype(::torch::kFloat).device(::torch::kCPU)};
-	return ::torch::tensor(values, options);
+	return ::torch::tensor(::std::vector<float>{values}, options);
 }
 
 void print_sizes(::torch::Tensor const &x)

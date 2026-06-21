@@ -1,6 +1,6 @@
-import std;
-import python;
 import typetorch.capi_bridge;
+import python;
+import std;
 
 namespace py = python;
 

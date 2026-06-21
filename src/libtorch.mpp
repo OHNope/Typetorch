@@ -43,6 +43,7 @@ using ::torch::set_num_threads;
 using ::torch::tensor;
 using ::torch::where;
 using ::torch::zeros;
+using ::torch::nn::Module;
 } // namespace torch
 
 export namespace c10

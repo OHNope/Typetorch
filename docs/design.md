@@ -89,12 +89,19 @@ The codebase uses C++26 modules to keep heavy dependencies controlled:
 - `src/libtorch.mpp` wraps LibTorch imports.
 - `src/typetorch_torch_mappings.mpp` maps Typetorch dtype/device enums to
   LibTorch scalar and device types.
-- `bindings/python.mpp` wraps `Python.h` and torch Python C API headers.
-- `src/typetorch_capi_reflect.mpp` imports both the typed tensor modules and the
-  Python module to generate wrappers.
+- `bindings/python.mpp` wraps `Python.h` as a named module and exposes only the
+  Python C API helpers the binding generator needs. It does not import LibTorch.
+- `src/libtorch.mpp` wraps LibTorch only, so ordinary C++ tests and examples do
+  not pull in CPython symbols or require linking `libpython`.
+- `bindings/torch_python.mpp` wraps the torch Python tensor bridge and exports
+  the small `torch_python` helper API used by the Python extension target.
+- `bindings/capi_bridge.mpp` keeps the generated wrapper registry ABI narrow so
+  Python and torch Python headers do not cross module boundaries.
+- `src/typetorch_capi_reflect.mpp` imports the typed tensor modules and the
+  `python` module to generate wrappers.
 
-This organization avoids mixing Python C headers and module imports in ordinary
-binding implementation files.
+This organization keeps normal binding code on module imports only. Translation
+units that contain third-party includes do not also contain C++ module imports.
 
 ## Visibility and ABI Surface
 

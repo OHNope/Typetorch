@@ -2,17 +2,16 @@ module;
 
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
-#include <torch/csrc/autograd/python_variable.h>
 
 export module python;
 
 export namespace python
 {
-using ::PyCFunction_NewEx;
 using ::PyBool_FromLong;
 using ::PyCapsule_GetPointer;
 using ::PyCapsule_New;
 using ::PyCFunction;
+using ::PyCFunction_NewEx;
 using ::PyErr_Format;
 using ::PyErr_Occurred;
 using ::PyErr_SetString;
@@ -32,8 +31,6 @@ using ::PyObject_IsTrue;
 using ::PyUnicode_AsUTF8AndSize;
 using ::PyUnicode_FromStringAndSize;
 using ::Py_ssize_t;
-using ::THPVariable_Unpack;
-using ::THPVariable_Wrap;
 
 inline constexpr int meth_varargs{METH_VARARGS};
 
@@ -72,11 +69,6 @@ inline auto tuple_get_item(PyObject *object, Py_ssize_t index) -> PyObject *
 	return PyTuple_GET_ITEM(object, index);
 }
 
-inline auto tensor_check(PyObject *object) -> bool
-{
-	return THPVariable_Check(object) != 0;
-}
-
 inline auto module_def(char const *name, char const *doc) -> PyModuleDef
 {
 	return PyModuleDef{
@@ -96,4 +88,5 @@ inline auto module_create(PyModuleDef *definition) -> PyObject *
 {
 	return PyModule_Create(definition);
 }
-}
+
+} // namespace python

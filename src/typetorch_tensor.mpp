@@ -8,7 +8,24 @@ export import :shape_meta;
 export import :common;
 export import :runtime_checks;
 
-#include "attribute.inc"
+#ifndef TYPETORCH_ATTR
+#define TYPETORCH_ATTR
+#if defined(__GNUC__) || defined(__CLANG__)
+#define TYPETORCH_ALWAYS_INLINE __attribute__((always_inline)) inline
+#define TYPETORCH_NO_INLINE __attribute__((noinline))
+#elif defined(_MSC_VER)
+#define TYPETORCH_ALWAYS_INLINE __forceinline
+#define TYPETORCH_NO_INLINE __declspec(noinline)
+#else
+#define TYPETORCH_ALWAYS_INLINE inline
+#define TYPETORCH_NO_INLINE
+#endif
+#ifdef __CUDACC__
+#define TYPETORCH_UNUSED
+#else
+#define TYPETORCH_UNUSED [[maybe_unused]]
+#endif
+#endif
 
 #define BROADCAST_COMPATIBLE(LShape, RShape) \
 	(::typetorch::detail::broadcast_compatible(LShape::dims, RShape::dims))
