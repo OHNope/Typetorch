@@ -1,0 +1,92 @@
+export module typetorch:containers;
+
+import libtorch;
+import :type;
+import :tensor;
+
+#ifndef TYPETORCH_UNUSED
+#ifdef __CUDACC__
+#define TYPETORCH_UNUSED
+#else
+#define TYPETORCH_UNUSED [[maybe_unused]]
+#endif
+#endif
+
+#ifndef TYPETORCH_SMARTPTR
+#define TYPETORCH_SMARTPTR
+#define TYPETORCH_MODULE_IMPL(Name, ImplType)                  \
+	class Name : public torch::nn::ModuleHolder<ImplType>      \
+	{                                                          \
+	public:                                                    \
+		using torch::nn::ModuleHolder<ImplType>::ModuleHolder; \
+		using Impl TYPETORCH_UNUSED = ImplType;                \
+	}
+#define TYPETORCH_MODULE(Name) TYPETORCH_MODULE_IMPL(Name, Name##Impl)
+#endif
+
+export namespace typetorch
+{
+
+namespace detail
+{
+template <class T>
+consteval auto member_names()
+{
+	constexpr auto ctx = std::meta::access_context::current();
+
+	constexpr std::size_t N =
+		std::meta::nonstatic_data_members_of(^^T, ctx).size();
+
+	auto members =
+		std::meta::nonstatic_data_members_of(^^T, ctx);
+
+	std::array<std::string_view, N> names{};
+
+	for (std::size_t i = 0; i < N; ++i)
+	{
+		names[i] = std::meta::identifier_of(members[i]);
+	}
+
+	return names;
+}
+template <::std::int64_t in, ::std::int64_t out, bool with_bias = true>
+struct LinearImpl : torch::nn::Module
+{
+	LinearImpl()
+	{
+		weight = register_parameter(
+			"weight",
+			torch::randn({out, in}));
+
+		if constexpr (with_bias)
+		{
+			bias = register_parameter(
+				"bias",
+				torch::randn({out}));
+		}
+	}
+
+	inline auto forward(torch::Tensor const &x)
+	{
+		// x:      [..., in_features]
+		// weight: [out_features, in_features]
+		// weight.t(): [in_features, out_features]
+		auto y = x.matmul(weight.t());
+
+		if (bias.defined())
+		{
+			y = y + bias;
+		}
+
+		return y;
+	}
+
+	static constexpr ::std::int64_t in_features_{in};
+	static constexpr ::std::int64_t out_features_{out};
+
+	Tensor<Shape<out, in>> weight;
+	Tensor<Shape<out>> bias;
+};
+} // namespace detail
+
+} // namespace typetorch

@@ -51,7 +51,14 @@ jobs:
             if [ -z "$before" ] || [ "$before" = "0000000000000000000000000000000000000000" ]; then
               changed="__all__"
             else
-              changed="$(git diff --name-only "$before" "${{ github.sha }}")"
+              current="${{ github.sha }}"
+              git cat-file -e "$before^{commit}" 2>/dev/null || git fetch --no-tags --depth=1 origin "$before" || true
+              git cat-file -e "$current^{commit}" 2>/dev/null || git fetch --no-tags --depth=1 origin "$current" || true
+              if git cat-file -e "$before^{commit}" 2>/dev/null && git cat-file -e "$current^{commit}" 2>/dev/null; then
+                changed="$(git diff --name-only "$before" "$current")"
+              else
+                changed="__all__"
+              fi
             fi
           fi
 
