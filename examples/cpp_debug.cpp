@@ -1,6 +1,7 @@
 import std;
 import libtorch;
 import typetorch.examples;
+import typetorch;
 import fast_io;
 
 namespace

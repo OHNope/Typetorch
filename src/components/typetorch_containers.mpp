@@ -49,6 +49,7 @@ consteval auto member_names()
 
 	return names;
 }
+
 template <::std::int64_t in, ::std::int64_t out, bool with_bias = true>
 struct LinearImpl : torch::nn::Module
 {

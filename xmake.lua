@@ -27,14 +27,18 @@ end
 
 local function detect_gcc_relocate_ldflags()
     local configured_flags = config_value("gcc_relocate_ldflags", "TYPETORCH_GCC_RELOCATE_LDFLAGS")
-    if configured_flags then return configured_flags end
+    if configured_flags then
+        return configured_flags
+    end
 
     local candidates = {}
     local gcc_root = config_value("gcc_root", "GCC_ROOT")
     local configured_toolchain = config_value("gcc_toolchain_root", "GCC_TOOLCHAIN_ROOT")
+
     if configured_toolchain then
         table.insert(candidates, configured_toolchain)
     end
+
     if gcc_root and gcc_root ~= "" then
         local triplet = config_value("gcc_triplet", "GCC_TRIPLET") or "x86_64-focal-linux-gnu"
         table.insert(candidates, path.join(path.directory(gcc_root), "x-tools", triplet))
@@ -46,17 +50,21 @@ local function detect_gcc_relocate_ldflags()
         local frontend_dir = path.join(root, "libexec", "gcc", triplet, version)
         local gcc_lib_dir = path.join(root, "lib", "gcc", triplet, version)
         local sysroot = config_value("gcc_sysroot", "GCC_SYSROOT") or path.join(root, triplet, "sysroot")
+
         if os.isfile(path.join(frontend_dir, "cc1plus")) and
            os.isfile(path.join(gcc_lib_dir, "crtbeginS.o")) and
            os.isfile(path.join(sysroot, "usr", "lib", "crti.o")) then
-            return format("-B%s/ -B%s/ -B%s/ -B%s/ --sysroot=%s",
-                          frontend_dir,
-                          gcc_lib_dir,
-                          path.join(sysroot, "usr", "lib"),
-                          path.join(sysroot, "lib"),
-                          sysroot)
+            return format(
+                "-B%s/ -B%s/ -B%s/ -B%s/ --sysroot=%s",
+                frontend_dir,
+                gcc_lib_dir,
+                path.join(sysroot, "usr", "lib"),
+                path.join(sysroot, "lib"),
+                sysroot
+            )
         end
     end
+
     return nil
 end
 
@@ -70,7 +78,15 @@ end
 
 add_rules("mode.debug", "mode.release")
 add_repositories("local-repo .")
-add_cxxflags("-fmodules", "-freflection", "-Wall"," -Wextra","-fvisibility=hidden", {force = true})
+
+add_cxxflags(
+    "-fmodules",
+    "-freflection",
+    "-Wall",
+    "-Wextra",
+    "-fvisibility=hidden",
+    {force = true}
+)
 
 local configured_python_include = config_value("python_include_dir", "PYTHON_INCLUDE_DIR")
 if configured_python_include then
@@ -96,15 +112,75 @@ local typetorch_examples_module_files = {
     "src/examples.cpp",
 }
 
-local function add_typetorch_modules()
-    for _, file in ipairs(typetorch_module_files) do
+local fast_io_files = {
+    "src/fast_io.mpp",
+    "src/fast_io.cpp"
+}
+
+local common_debug_cxxflags = {
+    "-O0",
+    "-g3",
+    "-fno-inline",
+    "-fno-omit-frame-pointer"
+}
+
+local common_release_cxxflags = {
+    "-O3",
+    "-march=native",
+    "-flto"
+}
+
+local common_release_ldflags = {
+    "-flto"
+}
+
+local sanitizer_flags = {
+    "-fsanitize=address,undefined"
+}
+
+local function add_file_list(files)
+    for _, file in ipairs(files) do
         add_files(file)
     end
 end
 
+local function add_typetorch_modules()
+    add_file_list(typetorch_module_files)
+end
+
 local function add_typetorch_examples_modules()
-    for _, file in ipairs(typetorch_examples_module_files) do
-        add_files(file)
+    add_file_list(typetorch_examples_module_files)
+end
+
+local function add_fast_io()
+    add_file_list(fast_io_files)
+end
+
+local function add_cxxflag_list(flags)
+    for _, flag in ipairs(flags) do
+        add_cxxflags(flag)
+    end
+end
+
+local function add_ldflag_list(flags)
+    for _, flag in ipairs(flags) do
+        add_ldflags(flag)
+    end
+end
+
+local function add_common_mode_flags()
+    if is_mode("debug") then
+        add_cxxflag_list(common_debug_cxxflags)
+        add_defines("TYPETORCH_DEBUG")
+
+        if get_config("sanitizers") then
+            add_cxxflag_list(sanitizer_flags)
+            add_ldflag_list(sanitizer_flags)
+        end
+    elseif is_mode("release") then
+        add_cxxflag_list(common_release_cxxflags)
+        add_ldflag_list(common_release_ldflags)
+        add_defines("TYPETORCH_RELEASE")
     end
 end
 
@@ -113,11 +189,13 @@ local function default_python()
     if python_env then
         return python_env
     end
+
     for _, candidate in ipairs({".venv/bin/python", "venv/bin/python"}) do
         if os.isfile(candidate) then
             return candidate
         end
     end
+
     return "python3"
 end
 
@@ -132,8 +210,6 @@ option("sanitizers")
     set_showmenu(true)
     set_description("Enable AddressSanitizer and UndefinedBehaviorSanitizer for debug builds")
 option_end()
-
-local python = get_config("python")
 
 local function add_python_sysincludedirs(target)
     local seen = {}
@@ -158,6 +234,7 @@ local function add_python_sysincludedirs(target)
         "/usr/local/include/python3.11",
         "/usr/local/include/python3.12",
     }
+
     for _, dir in ipairs(dirs) do
         if dir and dir ~= "" and not seen[dir] then
             target:add("sysincludedirs", dir)
@@ -170,7 +247,8 @@ rule("libtorch_runtime")
     on_load(function (target)
         local torch = target:pkg("libtorch")
         local torchdir = torch:installdir()
-        target:add("defines", format("TYPETORCH_LIBTORCH_ROOT=\"%s\"", torch:installdir()))
+
+        target:add("defines", format("TYPETORCH_LIBTORCH_ROOT=\"%s\"", torchdir))
         target:add("sysincludedirs", path.join(torchdir, "include"))
         target:add("sysincludedirs", path.join(torchdir, "include", "torch", "csrc", "api", "include"))
         target:add("linkdirs", path.join(torchdir, "lib"))
@@ -183,6 +261,7 @@ rule("python_extension")
     on_load(function (target)
         add_python_sysincludedirs(target)
     end)
+
     after_load(function (target)
         target:set("extension", ".so")
     end)
@@ -194,169 +273,99 @@ rule("python_headers")
     end)
 rule_end()
 
-target("typetorch_cpp_debug")
-    set_kind("binary")
-    add_rules("libtorch_runtime", "python_headers")
+local function add_common_target_settings(options)
+    options = options or {}
+
+    if options.default ~= nil then
+        set_default(options.default)
+    end
+
+    set_kind(options.kind or "binary")
+
+    add_rules("libtorch_runtime", options.python_rule or "python_headers")
     add_packages("libtorch")
-    add_files("src/fast_io.mpp", "src/fast_io.cpp", "examples/cpp_debug.cpp")
+
+    if options.torch_python then
+        add_links("torch_python")
+    end
+
+    -- Intentionally keep this common for all targets.
+    -- This reduces compiler command-line differences for shared module files.
+    add_includedirs(".", "third_party/fast_io/include")
+
+    add_fast_io()
+    add_common_mode_flags()
+end
+
+target("typetorch_cpp_debug")
+    add_common_target_settings()
+    add_files("examples/cpp_debug.cpp")
     add_typetorch_modules()
     add_typetorch_examples_modules()
-    add_includedirs("third_party/fast_io/include")
-    if is_mode("debug") then
-        add_cxxflags("-O0", "-g3", "-fno-inline", "-fno-omit-frame-pointer")
-        add_defines("TYPETORCH_DEBUG")
-        if get_config("sanitizers") then
-            add_cxxflags("-fsanitize=address,undefined")
-            add_ldflags("-fsanitize=address,undefined")
-        end
-    elseif is_mode("release") then
-        add_cxxflags("-O3", "-march=native", "-flto")
-        add_ldflags("-flto")
-        add_defines("TYPETORCH_RELEASE")
-    end
 target_end()
 
 target("typetorch_forwarding_benchmark")
-    set_default(false)
-    set_kind("binary")
-    add_rules("libtorch_runtime", "python_headers")
-    add_packages("libtorch")
-    add_files("src/fast_io.mpp", "src/fast_io.cpp", "benchmarks/forwarding_benchmark.cpp")
+    add_common_target_settings({default = false})
+    add_files("benchmarks/forwarding_benchmark.cpp")
     add_typetorch_modules()
-    add_includedirs("third_party/fast_io/include")
-    if is_mode("debug") then
-        add_cxxflags("-O0", "-g3", "-fno-inline", "-fno-omit-frame-pointer")
-        add_defines("TYPETORCH_DEBUG")
-    elseif is_mode("release") then
-        add_cxxflags("-O3", "-march=native", "-flto")
-        add_ldflags("-flto")
-        add_defines("TYPETORCH_RELEASE")
-    end
 target_end()
 
 target("binary_size_tensor_probe")
-    set_default(false)
-    set_kind("binary")
-    add_rules("libtorch_runtime", "python_headers")
-    add_packages("libtorch")
-    add_files("src/fast_io.mpp", "src/fast_io.cpp", "tests/binary_size_tensor_probe.cpp")
+    add_common_target_settings({default = false})
+    add_files("tests/binary_size_tensor_probe.cpp")
     add_typetorch_modules()
-    add_includedirs("third_party/fast_io/include")
-    if is_mode("debug") then
-        add_cxxflags("-O0", "-g3", "-fno-inline", "-fno-omit-frame-pointer")
-    elseif is_mode("release") then
-        add_cxxflags("-O2", "-g1", "-fno-omit-frame-pointer")
-    end
 target_end()
 
 target("binary_size_tensor_checked_probe")
-    set_default(false)
-    set_kind("binary")
-    add_rules("libtorch_runtime", "python_headers")
-    add_packages("libtorch")
-    add_files("src/fast_io.mpp", "src/fast_io.cpp", "tests/binary_size_tensor_checked_probe.cpp")
+    add_common_target_settings({default = false})
+    add_files("tests/binary_size_tensor_checked_probe.cpp")
     add_typetorch_modules()
-    add_includedirs("third_party/fast_io/include")
-    if is_mode("debug") then
-        add_cxxflags("-O0", "-g3", "-fno-inline", "-fno-omit-frame-pointer")
-    elseif is_mode("release") then
-        add_cxxflags("-O2", "-g1", "-fno-omit-frame-pointer")
-    end
 target_end()
 
 target("binary_size_tensor_unsafe_probe")
-    set_default(false)
-    set_kind("binary")
-    add_rules("libtorch_runtime", "python_headers")
-    add_packages("libtorch")
-    add_files("src/fast_io.mpp", "src/fast_io.cpp", "tests/binary_size_tensor_unsafe_probe.cpp")
+    add_common_target_settings({default = false})
+    add_files("tests/binary_size_tensor_unsafe_probe.cpp")
     add_typetorch_modules()
-    add_includedirs("third_party/fast_io/include")
-    if is_mode("debug") then
-        add_cxxflags("-O0", "-g3", "-fno-inline", "-fno-omit-frame-pointer")
-    elseif is_mode("release") then
-        add_cxxflags("-O2", "-g1", "-fno-omit-frame-pointer")
-    end
 target_end()
 
 target("binary_size_libtorch_probe")
-    set_default(false)
-    set_kind("binary")
-    add_rules("libtorch_runtime", "python_headers")
-    add_packages("libtorch")
+    add_common_target_settings({default = false})
     add_files("src/libtorch.mpp")
-    add_files("src/fast_io.mpp", "src/fast_io.cpp", "tests/binary_size_libtorch_probe.cpp")
-    add_includedirs("third_party/fast_io/include")
-    if is_mode("debug") then
-        add_cxxflags("-O0", "-g3", "-fno-inline", "-fno-omit-frame-pointer")
-    elseif is_mode("release") then
-        add_cxxflags("-O2", "-g1", "-fno-omit-frame-pointer")
-    end
+    add_files("tests/binary_size_libtorch_probe.cpp")
 target_end()
 
 target("typetorch_tensor_arithmetic_test")
-    set_default(false)
-    set_kind("binary")
-    add_rules("libtorch_runtime", "python_headers")
-    add_packages("libtorch")
-    add_files("src/fast_io.mpp", "src/fast_io.cpp", "tests/tensor_arithmetic_test.cpp")
+    add_common_target_settings({default = false})
+    add_files("tests/tensor_arithmetic_test.cpp")
     add_typetorch_modules()
-    add_includedirs("third_party/fast_io/include")
-    if is_mode("debug") then
-        add_cxxflags("-O0", "-g3", "-fno-inline", "-fno-omit-frame-pointer")
-    elseif is_mode("release") then
-        add_cxxflags("-O2", "-g1", "-fno-omit-frame-pointer")
-    end
 target_end()
 
 target("core")
-    set_kind("static")
-    add_rules("libtorch_runtime", "python_headers")
-    add_packages("libtorch")
-    add_links("torch_python")
-    add_includedirs("third_party/fast_io/include")
-    add_files("src/fast_io.mpp", "src/fast_io.cpp", "src/test.cpp")
+    add_common_target_settings({
+        kind = "static",
+        torch_python = true
+    })
+    add_files("src/test.cpp")
     add_typetorch_modules()
-    add_cxxflags("-fvisibility=hidden")
-    if is_mode("debug") then
-        add_cxxflags("-O0", "-g3", "-fno-inline", "-fno-omit-frame-pointer")
-        add_defines("TYPETORCH_DEBUG")
-        if get_config("sanitizers") then
-            add_cxxflags("-fsanitize=address,undefined")
-            add_ldflags("-fsanitize=address,undefined")
-        end
-    elseif is_mode("release") then
-        add_cxxflags("-O3", "-march=native", "-flto")
-        add_ldflags("-flto")
-        add_defines("TYPETORCH_RELEASE")
-    end
 target_end()
 
 target("typetorch_capi_ext")
-    set_default(false)
-    set_kind("shared")
-    add_rules("libtorch_runtime", "python_extension")
-    add_packages("libtorch")
-    add_links("torch_python")
+    add_common_target_settings({
+        default = false,
+        kind = "shared",
+        python_rule = "python_extension",
+        torch_python = true
+    })
+
     add_files("bindings/python.mpp")
     add_files("bindings/torch_python.mpp")
     add_files("bindings/capi_bridge.mpp")
     add_files("bindings/capi_module.cpp")
-    add_files("src/fast_io.mpp", "src/fast_io.cpp")
     add_files("src/typetorch_capi_reflect.mpp")
+
     add_typetorch_modules()
     add_typetorch_examples_modules()
-    add_includedirs(".", "third_party/fast_io/include")
-    add_cxxflags("-fvisibility=hidden")
-    if is_mode("debug") then
-        add_cxxflags("-O0", "-g3", "-fno-inline", "-fno-omit-frame-pointer")
-        add_defines("TYPETORCH_DEBUG")
-    elseif is_mode("release") then
-        add_cxxflags("-fno-unwind-tables", "-fno-asynchronous-unwind-tables")
-        add_cxxflags("-O3", "-march=native", "-flto")
-        add_ldflags("-flto")
-        add_defines("TYPETORCH_RELEASE")
-    end
+
     set_prefixname("")
     set_basename("typetorch_capi")
 target_end()

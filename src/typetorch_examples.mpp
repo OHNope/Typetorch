@@ -1,29 +1,29 @@
 export module typetorch.examples;
 
-export import std;
-export import libtorch;
-export import typetorch;
+import std;
+import libtorch;
+import typetorch;
 
 export namespace typetorch_examples
 {
 
 using Vector = typetorch::Tensor<typetorch::Shape<typetorch::dyn>,
-							   typetorch::DType::F32, typetorch::Device::CPU,
-							   typetorch::Layout::Any>;
+								 typetorch::DType::F32, typetorch::Device::CPU,
+								 typetorch::Layout::Any>;
 using Matrix = typetorch::Tensor<typetorch::Shape<typetorch::dyn, typetorch::dyn>,
-							   typetorch::DType::F32, typetorch::Device::CPU,
-							   typetorch::Layout::Any>;
+								 typetorch::DType::F32, typetorch::Device::CPU,
+								 typetorch::Layout::Any>;
 using Matrix3In = typetorch::Tensor<typetorch::Shape<typetorch::dyn, 3>,
-								  typetorch::DType::F32, typetorch::Device::CPU,
-								  typetorch::Layout::Any>;
+									typetorch::DType::F32, typetorch::Device::CPU,
+									typetorch::Layout::Any>;
 using Matrix3Out = typetorch::Tensor<typetorch::Shape<3, typetorch::dyn>,
-								   typetorch::DType::F32, typetorch::Device::CPU,
-								   typetorch::Layout::Any>;
+									 typetorch::DType::F32, typetorch::Device::CPU,
+									 typetorch::Layout::Any>;
 using Matrix2Out = typetorch::Tensor<typetorch::Shape<typetorch::dyn, 2>,
-								   typetorch::DType::F32, typetorch::Device::CPU,
-								   typetorch::Layout::Any>;
+									 typetorch::DType::F32, typetorch::Device::CPU,
+									 typetorch::Layout::Any>;
 using SizeVector = typetorch::Tensor<typetorch::Shape<1>, typetorch::DType::I64,
-								   typetorch::Device::CPU>;
+									 typetorch::Device::CPU>;
 
 SizeVector checked_vector_sizes(Vector const &x);
 Vector add_vectors(Vector const &a, Vector const &b);
