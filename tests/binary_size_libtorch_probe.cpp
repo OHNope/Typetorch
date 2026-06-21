@@ -11,52 +11,52 @@ import fast_io;
 namespace typetorch_binary_size_libtorch_probe
 {
 
-TYPETORCH_SIZE_NOINLINE auto raw_identity(::at::Tensor const &x) -> ::at::Tensor
+TYPETORCH_SIZE_NOINLINE auto raw_identity(::torch::Tensor const &x) -> ::torch::Tensor
 {
 	return x;
 }
 
-TYPETORCH_SIZE_NOINLINE auto raw_add(::at::Tensor const &a, ::at::Tensor const &b)
-	-> ::at::Tensor
+TYPETORCH_SIZE_NOINLINE auto raw_add(::torch::Tensor const &a, ::torch::Tensor const &b)
+	-> ::torch::Tensor
 {
 	return a.add(b);
 }
 
-TYPETORCH_SIZE_NOINLINE auto raw_numel(::at::Tensor const &x) -> ::std::int64_t
+TYPETORCH_SIZE_NOINLINE auto raw_numel(::torch::Tensor const &x) -> ::std::int64_t
 {
 	return x.numel();
 }
 
-TYPETORCH_SIZE_NOINLINE auto native_raw_ref(::at::Tensor const &x)
-	-> ::at::Tensor const &
+TYPETORCH_SIZE_NOINLINE auto native_raw_ref(::torch::Tensor const &x)
+	-> ::torch::Tensor const &
 {
 	return x;
 }
 
-TYPETORCH_SIZE_NOINLINE auto native_retain_checked(::at::Tensor const &x)
-	-> ::at::Tensor
+TYPETORCH_SIZE_NOINLINE auto native_retain_checked(::torch::Tensor const &x)
+	-> ::torch::Tensor
 {
 	return x;
 }
 
-TYPETORCH_SIZE_NOINLINE auto native_retain_unsafe(::at::Tensor const &x)
-	-> ::at::Tensor
+TYPETORCH_SIZE_NOINLINE auto native_retain_unsafe(::torch::Tensor const &x)
+	-> ::torch::Tensor
 {
 	return x;
 }
 
-TYPETORCH_SIZE_NOINLINE auto native_unwrap(::at::Tensor x) -> ::at::Tensor
+TYPETORCH_SIZE_NOINLINE auto native_unwrap(::torch::Tensor x) -> ::torch::Tensor
 {
 	return x;
 }
 
-TYPETORCH_SIZE_NOINLINE auto native_add(::at::Tensor const &a,
-										::at::Tensor const &b) -> ::at::Tensor
+TYPETORCH_SIZE_NOINLINE auto native_add(::torch::Tensor const &a,
+										::torch::Tensor const &b) -> ::torch::Tensor
 {
 	return a.add(b);
 }
 
-TYPETORCH_SIZE_NOINLINE auto native_numel(::at::Tensor const &x) -> ::std::int64_t
+TYPETORCH_SIZE_NOINLINE auto native_numel(::torch::Tensor const &x) -> ::std::int64_t
 {
 	return x.numel();
 }
@@ -67,9 +67,9 @@ int main()
 {
 	namespace probe = typetorch_binary_size_libtorch_probe;
 
-	auto options{::at::TensorOptions().dtype(::at::kFloat).device(::at::kCPU)};
-	auto a{::at::ones({4}, options)};
-	auto b{::at::ones({4}, options)};
+	auto options{::torch::TensorOptions().dtype(::torch::kFloat).device(::torch::kCPU)};
+	auto a{::torch::ones({4}, options)};
+	auto b{::torch::ones({4}, options)};
 
 	auto raw_sum{probe::raw_add(a, b)};
 	auto native_a{probe::native_retain_unsafe(a)};

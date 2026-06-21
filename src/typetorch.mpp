@@ -4,7 +4,7 @@ export import std;
 export import libtorch;
 
 export import :types;
-export import :aten_mappings;
+export import :torch_mappings;
 export import :shape_meta;
 export import :common;
 export import :tensor;

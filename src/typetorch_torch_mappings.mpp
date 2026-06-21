@@ -1,0 +1,31 @@
+export module typetorch:torch_mappings;
+
+import std;
+import libtorch;
+export import :types;
+
+export namespace typetorch
+{
+
+namespace detail
+{
+
+constexpr inline ::std::array<::torch::ScalarType, 6> torch_dtype_map{
+	::torch::kFloat, ::torch::kFloat, ::torch::kHalf, ::torch::kBFloat16, ::torch::kLong, ::torch::kBool};
+
+constexpr inline ::std::array<c10::DeviceType, 3> torch_device_map{
+	c10::DeviceType::CPU, c10::DeviceType::CPU, c10::DeviceType::CUDA};
+
+consteval inline auto to_torch_dtype(DType dtype) noexcept -> ::torch::ScalarType
+{
+	return torch_dtype_map[static_cast<::std::size_t>(dtype)];
+}
+
+consteval inline auto to_torch_device(Device device) noexcept -> c10::DeviceType
+{
+	return torch_device_map[static_cast<::std::size_t>(device)];
+}
+
+} // namespace detail
+
+} // namespace typetorch

@@ -3,7 +3,7 @@ export module typetorch:tensor;
 import std;
 import libtorch;
 export import :types;
-export import :aten_mappings;
+export import :torch_mappings;
 export import :shape_meta;
 export import :common;
 export import :runtime_checks;
@@ -13,50 +13,50 @@ export import :runtime_checks;
 #define BROADCAST_COMPATIBLE(LShape, RShape) \
 	(::typetorch::detail::broadcast_compatible(LShape::dims, RShape::dims))
 
-#define BROADCAST_SHAPE_T(LShape, RShape)               \
+#define BROADCAST_SHAPE_T(LShape, RShape)                 \
 	typename[: ::typetorch::detail::broadcast_shape_meta( \
 				   LShape::dims, RShape::dims):]
 
-#define MATMUL_SHAPE_T(LShape, RShape)               \
+#define MATMUL_SHAPE_T(LShape, RShape)                 \
 	typename[: ::typetorch::detail::matmul_shape_meta( \
 				   LShape::dims, RShape::dims):]
 
-#define TRANSPOSE_SHAPE_T(ShapeKind, Dim0, Dim1)        \
+#define TRANSPOSE_SHAPE_T(ShapeKind, Dim0, Dim1)          \
 	typename[: ::typetorch::detail::transpose_shape_meta( \
 				   ShapeKind::dims, Dim0, Dim1):]
 
 #define TRANSPOSE_LAYOUT(ShapeKind, LayoutKind, Dim0, Dim1) \
 	(::typetorch::detail::transpose_layout(LayoutKind, ShapeKind::dims, Dim0, Dim1))
 
-#define PERMUTE_SHAPE_T(ShapeKind, PermuteDims)       \
+#define PERMUTE_SHAPE_T(ShapeKind, PermuteDims)         \
 	typename[: ::typetorch::detail::permute_shape_meta( \
 				   ShapeKind::dims, PermuteDims):]
 
 #define PERMUTE_LAYOUT(ShapeKind, LayoutKind, PermuteDims) \
 	(::typetorch::detail::permute_layout(LayoutKind, ShapeKind::dims, PermuteDims))
 
-#define VIEW_SHAPE_T(ShapeKind, ResultDims)        \
+#define VIEW_SHAPE_T(ShapeKind, ResultDims)          \
 	typename[: ::typetorch::detail::view_shape_meta( \
 				   ShapeKind::dims, ResultDims):]
 
-#define FLATTEN_SHAPE_T(ShapeKind, StartDim, EndDim)  \
+#define FLATTEN_SHAPE_T(ShapeKind, StartDim, EndDim)    \
 	typename[: ::typetorch::detail::flatten_shape_meta( \
 				   ShapeKind::dims, StartDim, EndDim):]
 
-#define SQUEEZE_SHAPE_T(ShapeKind)                    \
+#define SQUEEZE_SHAPE_T(ShapeKind)                      \
 	typename[: ::typetorch::detail::squeeze_shape_meta( \
 				   ShapeKind::dims):]
 
-#define SQUEEZE_DIM_SHAPE_T(ShapeKind, Dim)           \
+#define SQUEEZE_DIM_SHAPE_T(ShapeKind, Dim)             \
 	typename[: ::typetorch::detail::squeeze_shape_meta( \
 				   ShapeKind::dims, Dim):]
 
-#define UNSQUEEZE_SHAPE_T(ShapeKind, Dim)               \
+#define UNSQUEEZE_SHAPE_T(ShapeKind, Dim)                 \
 	typename[: ::typetorch::detail::unsqueeze_shape_meta( \
 				   ShapeKind::dims, Dim):]
 
 #define NORMALIZED_SHAPE_COMPATIBLE(InputShape, NormalizedShape) \
-	(::typetorch::detail::normalized_shape_compatible(             \
+	(::typetorch::detail::normalized_shape_compatible(           \
 		InputShape::dims, NormalizedShape::dims))
 
 export namespace typetorch
@@ -66,15 +66,15 @@ namespace detail
 {
 
 consteval inline auto static_arange_size(::std::size_t start,
-                                         ::std::size_t end,
-                                         ::std::size_t step)
-    -> ::std::int64_t
+										 ::std::size_t end,
+										 ::std::size_t step)
+	-> ::std::int64_t
 {
-    if (step == 0 || end < start)
-    {
-        return 0;
-    }
-    return static_cast<::std::int64_t>((end - start + step - 1) / step);
+	if (step == 0 || end < start)
+	{
+		return 0;
+	}
+	return static_cast<::std::int64_t>((end - start + step - 1) / step);
 }
 
 } // namespace detail
@@ -96,12 +96,12 @@ public:
 	inline Tensor(Tensor &&) noexcept = default;
 	inline auto operator=(Tensor &&) noexcept -> Tensor & = default;
 
-	[[nodiscard]] TYPETORCH_ALWAYS_INLINE auto unsafe_raw() const & noexcept -> ::at::Tensor const &
+	[[nodiscard]] TYPETORCH_ALWAYS_INLINE auto unsafe_raw() const & noexcept -> ::torch::Tensor const &
 	{
 		return impl_;
 	}
 
-	[[nodiscard]] TYPETORCH_ALWAYS_INLINE auto unwrap() && noexcept -> ::at::Tensor
+	[[nodiscard]] TYPETORCH_ALWAYS_INLINE auto unwrap() && noexcept -> ::torch::Tensor
 	{
 		return ::std::move(impl_);
 	}
@@ -142,9 +142,9 @@ public:
 			::typetorch::Shape<detail::static_arange_size(start, end, step)>, dtype,
 			device, Layout::Contiguous>;
 		return Result::unsafe_move(
-			::at::arange(static_cast<::std::int64_t>(start),
-						 static_cast<::std::int64_t>(end),
-						 static_cast<::std::int64_t>(step), Result::factory_options));
+			::torch::arange(static_cast<::std::int64_t>(start),
+							static_cast<::std::int64_t>(end),
+							static_cast<::std::int64_t>(step), Result::factory_options));
 	}
 
 	inline auto detach()
@@ -152,21 +152,21 @@ public:
 		return impl_.detach();
 	}
 
-	[[nodiscard]] static inline auto retain(::at::Tensor const &raw) -> Tensor
+	[[nodiscard]] static inline auto retain(::torch::Tensor const &raw) -> Tensor
 	{
 		detail::check_tensor_compatible_runtime(raw, shape::dims, dtype, device,
 												layout);
 		return unsafe_retain(raw);
 	}
 
-	[[nodiscard]] TYPETORCH_ALWAYS_INLINE static auto unsafe_retain(::at::Tensor const &raw) noexcept
+	[[nodiscard]] TYPETORCH_ALWAYS_INLINE static auto unsafe_retain(::torch::Tensor const &raw) noexcept
 		-> Tensor
 	{
-		::at::Tensor retained{raw};
+		::torch::Tensor retained{raw};
 		return Tensor(::std::move(retained)); // get the copy of the raw
 	}
 
-	[[nodiscard]] TYPETORCH_ALWAYS_INLINE static auto unsafe_move(::at::Tensor &&raw) noexcept -> Tensor
+	[[nodiscard]] TYPETORCH_ALWAYS_INLINE static auto unsafe_move(::torch::Tensor &&raw) noexcept -> Tensor
 	{
 		return Tensor(::std::move(raw));
 	}
@@ -199,14 +199,14 @@ public:
 	{
 		static_assert(dtype == DType::Any || detail::is_floating_dtype(dtype),
 					  "Tensor::gelu() requires floating tensor dtype");
-		return unsafe_move(::at::gelu(unsafe_raw(), approximate));
+		return unsafe_move(::torch::gelu(unsafe_raw(), approximate));
 	}
 	inline void gelu_(::c10::string_view approximate = "none")
 	{
 		static_assert(dtype == DType::Any || detail::is_floating_dtype(dtype),
 					  "Tensor::gelu_() requires floating tensor dtype");
-		::at::Tensor raw{unsafe_raw()};
-		::at::gelu_(raw, approximate);
+		::torch::Tensor raw{unsafe_raw()};
+		::torch::gelu_(raw, approximate);
 	}
 
 	[[nodiscard]] inline auto softmax(::std::int64_t const dim) const
@@ -229,7 +229,7 @@ public:
 
 	template <TensorLike Other>
 	[[nodiscard]] TYPETORCH_ALWAYS_INLINE auto add(Other const &other,
-												 ::at::Scalar const &alpha = 1) const
+												   ::torch::Scalar const &alpha = 1) const
 	{
 		using OtherShape = typename Other::shape;
 		static_assert(BROADCAST_COMPATIBLE(shape, OtherShape),
@@ -242,15 +242,15 @@ public:
 		return Result::unsafe_move(unsafe_raw().add(other.unsafe_raw(), alpha));
 	}
 
-	[[nodiscard]] inline auto add(::at::Scalar const &other,
-								  ::at::Scalar const &alpha = 1) const
+	[[nodiscard]] inline auto add(::torch::Scalar const &other,
+								  ::torch::Scalar const &alpha = 1) const
 	{
 		return unsafe_move(unsafe_raw().add(other, alpha));
 	}
 
 	template <TensorLike Other>
 	[[nodiscard]] inline auto sub(Other const &other,
-								  ::at::Scalar const &alpha = 1) const
+								  ::torch::Scalar const &alpha = 1) const
 	{
 		using OtherShape = typename Other::shape;
 		static_assert(BROADCAST_COMPATIBLE(shape, OtherShape),
@@ -263,8 +263,8 @@ public:
 		return Result::unsafe_move(unsafe_raw().sub(other.unsafe_raw(), alpha));
 	}
 
-	[[nodiscard]] inline auto sub(::at::Scalar const &other,
-								  ::at::Scalar const &alpha = 1) const
+	[[nodiscard]] inline auto sub(::torch::Scalar const &other,
+								  ::torch::Scalar const &alpha = 1) const
 	{
 		return unsafe_move(unsafe_raw().sub(other, alpha));
 	}
@@ -283,7 +283,7 @@ public:
 		return Result::unsafe_move(unsafe_raw().mul(other.unsafe_raw()));
 	}
 
-	[[nodiscard]] inline auto mul(::at::Scalar const &other) const
+	[[nodiscard]] inline auto mul(::torch::Scalar const &other) const
 	{
 		return unsafe_move(unsafe_raw().mul(other));
 	}
@@ -302,7 +302,7 @@ public:
 		return Result::unsafe_move(unsafe_raw().div(other.unsafe_raw()));
 	}
 
-	[[nodiscard]] inline auto div(::at::Scalar const &other) const
+	[[nodiscard]] inline auto div(::torch::Scalar const &other) const
 	{
 		return unsafe_move(unsafe_raw().div(other));
 	}
@@ -324,7 +324,7 @@ public:
 		using Result =
 			Tensor<TRANSPOSE_SHAPE_T(shape, Dim0, Dim1), dtype, device,
 				   ::typetorch::detail::transpose_layout(layout, shape::dims, Dim0,
-													   Dim1)>;
+														 Dim1)>;
 		return Result::unsafe_move(unsafe_raw().transpose(Dim0, Dim1));
 	}
 
@@ -408,9 +408,9 @@ public:
 					  "normalized_shape must match the trailing input dimensions");
 		constexpr ::std::int64_t normalized_shape[]{NormalizedDims...};
 		using Result = Tensor<shape, dtype, device, Layout::Any>;
-		return Result::unsafe_move(::at::layer_norm(
-			unsafe_raw(), normalized_shape, ::std::optional<::at::Tensor>{},
-			::std::optional<::at::Tensor>{}, eps, cudnn_enable));
+		return Result::unsafe_move(::torch::layer_norm(
+			unsafe_raw(), normalized_shape, {},
+			{}, eps, cudnn_enable));
 	}
 
 	template <TensorLike Weight, TensorLike Bias>
@@ -430,10 +430,10 @@ public:
 			Tensor<shape, dtype,
 				   common_device(common_device(device, Weight::device), Bias::device),
 				   Layout::Any>;
-		return Result::unsafe_move(::at::layer_norm(
+		return Result::unsafe_move(::torch::layer_norm(
 			unsafe_raw(), NormalizedShape::dims,
-			::std::optional<::at::Tensor>{weight.unsafe_raw()},
-			::std::optional<::at::Tensor>{bias.unsafe_raw()}, eps, cudnn_enable));
+			weight.unsafe_raw(),
+			bias.unsafe_raw(), eps, cudnn_enable));
 	}
 
 	template <::std::int64_t... NormalizedDims>
@@ -448,9 +448,8 @@ public:
 					  "normalized_shape must match the trailing input dimensions");
 		constexpr ::std::int64_t normalized_shape[]{NormalizedDims...};
 		using Result = Tensor<shape, dtype, device, Layout::Any>;
-		return Result::unsafe_move(::at::rms_norm(
-			unsafe_raw(), normalized_shape, ::std::optional<::at::Tensor>{},
-			::std::optional<double>{}));
+		return Result::unsafe_move(::torch::rms_norm(
+			unsafe_raw(), normalized_shape));
 	}
 
 	template <::std::int64_t... NormalizedDims>
@@ -465,9 +464,9 @@ public:
 					  "normalized_shape must match the trailing input dimensions");
 		constexpr ::std::int64_t normalized_shape[]{NormalizedDims...};
 		using Result = Tensor<shape, dtype, device, Layout::Any>;
-		return Result::unsafe_move(::at::rms_norm(
-			unsafe_raw(), normalized_shape, ::std::optional<::at::Tensor>{},
-			::std::optional<double>{eps}));
+		return Result::unsafe_move(::torch::rms_norm(
+			unsafe_raw(), normalized_shape, {},
+			eps));
 	}
 
 	template <TensorLike Weight>
@@ -480,10 +479,9 @@ public:
 					  "weight shape must match the trailing input dimensions");
 		using Result = Tensor<shape, dtype, common_device(device, Weight::device),
 							  Layout::Any>;
-		return Result::unsafe_move(::at::rms_norm(
+		return Result::unsafe_move(::torch::rms_norm(
 			unsafe_raw(), NormalizedShape::dims,
-			::std::optional<::at::Tensor>{weight.unsafe_raw()},
-			::std::optional<double>{}));
+			weight.unsafe_raw()));
 	}
 
 	template <TensorLike Weight>
@@ -496,15 +494,15 @@ public:
 					  "weight shape must match the trailing input dimensions");
 		using Result = Tensor<shape, dtype, common_device(device, Weight::device),
 							  Layout::Any>;
-		return Result::unsafe_move(::at::rms_norm(
+		return Result::unsafe_move(::torch::rms_norm(
 			unsafe_raw(), NormalizedShape::dims,
-			::std::optional<::at::Tensor>{weight.unsafe_raw()},
-			::std::optional<double>{eps}));
+			weight.unsafe_raw(),
+			eps));
 	}
 
 	template <TensorLike Mask>
 	[[nodiscard]] inline auto masked_fill(Mask const &mask,
-										  ::at::Scalar const &value) const
+										  ::torch::Scalar const &value) const
 	{
 		using MaskShape = typename Mask::shape;
 		static_assert(Mask::dtype == DType::Any || Mask::dtype == DType::Bool,
@@ -518,7 +516,7 @@ public:
 
 	template <TensorLike Mask>
 	[[nodiscard]] inline auto mask_fill(Mask const &mask,
-										::at::Scalar const &value) const
+										::torch::Scalar const &value) const
 	{
 		return masked_fill(mask, value);
 	}
@@ -543,18 +541,18 @@ public:
 											Condition::device),
 							  Layout::Any>;
 		return Result::unsafe_move(
-			::at::where(condition.unsafe_raw(), x.unsafe_raw(), y.unsafe_raw()));
+			::torch::where(condition.unsafe_raw(), x.unsafe_raw(), y.unsafe_raw()));
 	}
 
 	template <Device ndevice, DType ndtype = dtype>
 	[[nodiscard]] inline auto to() &&
 	{
-		return Tensor<shape, ndtype, ndevice, layout>::unsafe_move(unsafe_raw().to(::at::TensorOptions{}.dtype(detail::to_aten_dtype(ndtype)).device(detail::to_aten_device(ndevice))));
+		return Tensor<shape, ndtype, ndevice, layout>::unsafe_move(unsafe_raw().to(::torch::TensorOptions{}.dtype(detail::to_torch_dtype(ndtype)).device(detail::to_torch_device(ndevice))));
 	};
 	template <DType ndtype>
 	[[nodiscard]] inline auto to() &&
 	{
-		return Tensor<shape, ndtype, device, layout>::unsafe_move(unsafe_raw().to(::at::TensorOptions{}.dtype(detail::to_aten_dtype(ndtype))));
+		return Tensor<shape, ndtype, device, layout>::unsafe_move(unsafe_raw().to(::torch::TensorOptions{}.dtype(detail::to_torch_dtype(ndtype))));
 	};
 
 	[[nodiscard]] static inline auto empty() -> Tensor
@@ -563,7 +561,7 @@ public:
 					  "Tensor::empty() requires a fully static shape");
 
 		check_factory_layout_compiletime();
-		return unsafe_move(::at::empty(shape::dims, factory_options));
+		return unsafe_move(::torch::empty(shape::dims, factory_options));
 	}
 
 	[[nodiscard]] static inline auto zeros() -> Tensor
@@ -572,7 +570,7 @@ public:
 					  "Tensor::zeros() requires a fully static shape");
 
 		check_factory_layout_compiletime();
-		return unsafe_move(::at::zeros(shape::dims, factory_options));
+		return unsafe_move(::torch::zeros(shape::dims, factory_options));
 	}
 
 	[[nodiscard]] static inline auto ones() -> Tensor
@@ -581,7 +579,7 @@ public:
 					  "Tensor::ones() requires a fully static shape");
 
 		check_factory_layout_compiletime();
-		return unsafe_move(::at::ones(shape::dims, factory_options));
+		return unsafe_move(::torch::ones(shape::dims, factory_options));
 	}
 
 	[[nodiscard]] static inline auto rand() -> Tensor
@@ -590,7 +588,7 @@ public:
 					  "Tensor::rand() requires a fully static shape");
 
 		check_factory_layout_compiletime();
-		return unsafe_move(::at::rand(shape::dims, factory_options));
+		return unsafe_move(::torch::rand(shape::dims, factory_options));
 	}
 
 	[[nodiscard]] static inline auto randn() -> Tensor
@@ -599,23 +597,23 @@ public:
 					  "Tensor::randn() requires a fully static shape");
 
 		check_factory_layout_compiletime();
-		return unsafe_move(::at::randn(shape::dims, factory_options));
+		return unsafe_move(::torch::randn(shape::dims, factory_options));
 	}
 
 
-	[[nodiscard]] inline auto checked_wrap(::at::Tensor const &raw)
+	[[nodiscard]] inline auto checked_wrap(::torch::Tensor const &raw)
 
 	{
 		return retain(raw);
 	}
 
-	[[nodiscard]] TYPETORCH_ALWAYS_INLINE auto unsafe_wrap(::at::Tensor const &raw) noexcept
+	[[nodiscard]] TYPETORCH_ALWAYS_INLINE auto unsafe_wrap(::torch::Tensor const &raw) noexcept
 
 	{
 		return unsafe_retain(raw);
 	}
 
-	[[nodiscard]] TYPETORCH_ALWAYS_INLINE auto unsafe_wrap(::at::Tensor &&raw) noexcept
+	[[nodiscard]] TYPETORCH_ALWAYS_INLINE auto unsafe_wrap(::torch::Tensor &&raw) noexcept
 
 	{
 		return unsafe_move(raw);
@@ -626,15 +624,15 @@ public:
 		return unsafe_move(this->unsafe_raw().clone());
 	}
 	// static method -> factory_options
-	static inline ::at::TensorOptions const factory_options{
-		::at::TensorOptions{}
-			.dtype(detail::to_aten_dtype(dtype))
-			.device(detail::to_aten_device(device))};
+	static inline ::torch::TensorOptions const factory_options{
+		::torch::TensorOptions{}
+			.dtype(detail::to_torch_dtype(dtype))
+			.device(detail::to_torch_device(device))};
 
-	[[nodiscard]] inline auto operator>(::at::Scalar const &other) const
+	[[nodiscard]] inline auto operator>(::torch::Scalar const &other) const
 	{
 		using Result = Tensor<shape, DType::Bool, device, layout>;
-		return Result::unsafe_move(::at::gt(unsafe_raw(), other));
+		return Result::unsafe_move(::torch::gt(unsafe_raw(), other));
 	}
 
 private:
@@ -644,18 +642,18 @@ private:
 					  "Tensor factory functions create contiguous tensors");
 	}
 
-	[[nodiscard]] static inline auto checked_move(::at::Tensor raw) -> Tensor
+	[[nodiscard]] static inline auto checked_move(::torch::Tensor raw) -> Tensor
 	{
 		detail::check_tensor_compatible_runtime(raw, shape::dims, dtype, device,
 												layout);
 		return unsafe_move(::std::move(raw));
 	}
 
-	inline explicit Tensor(::at::Tensor raw) noexcept
+	inline explicit Tensor(::torch::Tensor raw) noexcept
 		: impl_{::std::move(raw)}
 	{}
 
-	::at::Tensor impl_;
+	::torch::Tensor impl_;
 };
 
 } // namespace typetorch

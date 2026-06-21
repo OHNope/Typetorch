@@ -1,56 +1,49 @@
 module;
 
-#include <ATen/ATen.h>
-#include <ATen/core/grad_mode.h>
-#include <ATen/Parallel.h>
-#include <ATen/ops/gelu.h>
-#include <ATen/ops/gt.h>
-#include <ATen/ops/layer_norm.h>
-#include <ATen/ops/rms_norm.h>
-#include <ATen/ops/where.h>
+#include <torch/torch.h>
 
 export module libtorch;
 
-export namespace at
+export namespace torch
 {
-using ::at::BFloat16;
-using ::at::Device;
-using ::at::GradMode;
-using ::at::AutoGradMode;
-using ::at::NoGradGuard;
-using ::at::Scalar;
-using ::at::ScalarType;
-using ::at::Tensor;
-using ::at::TensorOptions;
-using ::at::kBFloat16;
-using ::at::kDouble;
-using ::at::kInt;
-using ::at::kShort;
-using ::at::kChar;
-using ::at::kByte;
-using ::at::kBool;
-using ::at::kCPU;
-using ::at::kCUDA;
-using ::at::kFloat;
-using ::at::kHalf;
-using ::at::kLong;
-using ::at::arange;
-using ::at::empty;
-using ::at::gelu;
-using ::at::gelu_;
-using ::at::get_num_threads;
-using ::at::gt;
-using ::at::layer_norm;
-using ::at::ones;
-using ::at::rand;
-using ::at::randn;
-using ::at::rms_norm;
-using ::at::set_num_interop_threads;
-using ::at::set_num_threads;
-using ::at::tensor;
-using ::at::where;
-using ::at::zeros;
-} // namespace at
+using ::c10::BFloat16;
+using ::c10::Device;
+using ::torch::GradMode;
+using ::torch::AutoGradMode;
+using ::torch::NoGradGuard;
+using ::c10::Scalar;
+using ::c10::ScalarType;
+using ::torch::Tensor;
+using ::torch::TensorOptions;
+using ::torch::kBFloat16;
+using ::torch::kDouble;
+using ::torch::kInt;
+using ::torch::kShort;
+using ::torch::kChar;
+using ::torch::kByte;
+using ::torch::kBool;
+using ::torch::kCPU;
+using ::torch::kCUDA;
+using ::torch::kFloat;
+using ::torch::kHalf;
+using ::torch::kLong;
+using ::torch::arange;
+using ::torch::empty;
+using ::torch::gelu;
+using ::torch::gelu_;
+using ::torch::get_num_threads;
+using ::torch::gt;
+using ::torch::layer_norm;
+using ::torch::ones;
+using ::torch::rand;
+using ::torch::randn;
+using ::torch::rms_norm;
+using ::torch::set_num_interop_threads;
+using ::torch::set_num_threads;
+using ::torch::tensor;
+using ::torch::where;
+using ::torch::zeros;
+} // namespace torch
 
 export namespace c10
 {

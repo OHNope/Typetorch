@@ -51,7 +51,7 @@ struct Sample
 template <class Fn>
 [[nodiscard]] auto run_loop(::std::int64_t iterations, Fn &&fn) -> double
 {
-	::at::Tensor sink;
+	::torch::Tensor sink;
 	::std::int64_t observed{};
 
 	auto const begin{Clock::now()};
@@ -94,16 +94,16 @@ void print_sample(Sample const &sample)
 
 int main(int argc, char **argv)
 {
-	::at::NoGradGuard no_grad;
-	::at::set_num_threads(1);
-	::at::set_num_interop_threads(1);
+	::torch::NoGradGuard no_grad;
+	::torch::set_num_threads(1);
+	::torch::set_num_interop_threads(1);
 
 	auto const iterations{read_iterations(argc, argv)};
-	auto const options{::at::TensorOptions().dtype(::at::kFloat).device(::at::kCPU)};
+	auto const options{::torch::TensorOptions().dtype(::torch::kFloat).device(::torch::kCPU)};
 
-	auto const lhs{::at::randn({64, 64}, options)};
-	auto const rhs{::at::randn({64, 64}, options)};
-	auto const cube{::at::randn({16, 32, 8}, options)};
+	auto const lhs{::torch::randn({64, 64}, options)};
+	auto const rhs{::torch::randn({64, 64}, options)};
+	auto const cube{::torch::randn({16, 32, 8}, options)};
 
 	auto lhs_dyn{Matrix::unsafe_retain(lhs)};
 	auto rhs_dyn{Matrix::unsafe_retain(rhs)};
@@ -133,8 +133,8 @@ int main(int argc, char **argv)
 		[&] { return StaticCube::unsafe_retain(cube).permute<0, 2, 1>().unwrap(); }));
 
 	::fast_io::io::println("iterations=", iterations,
-						   ", threads=", ::at::get_num_threads());
-	::fast_io::io::println("ratio = typetorch / raw ::at::Tensor; near 1.0 means no measurable forwarding overhead");
+						   ", threads=", ::torch::get_num_threads());
+	::fast_io::io::println("ratio = typetorch / raw ::torch::Tensor; near 1.0 means no measurable forwarding overhead");
 	for (auto const &sample : samples)
 	{
 		print_sample(sample);

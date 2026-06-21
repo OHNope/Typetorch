@@ -32,33 +32,33 @@ namespace detail
 	return "<unknown DType>";
 }
 
-[[nodiscard]] inline auto scalar_type_name(::at::ScalarType dtype) noexcept
+[[nodiscard]] inline auto scalar_type_name(::torch::ScalarType dtype) noexcept
 	-> char const *
 {
 	switch (dtype)
 	{
-	case ::at::kFloat:
-		return "F32 / at::kFloat";
-	case ::at::kHalf:
-		return "F16 / at::kHalf";
-	case ::at::kBFloat16:
-		return "BF16 / at::kBFloat16";
-	case ::at::kLong:
-		return "I64 / at::kLong";
-	case ::at::kBool:
-		return "Bool / at::kBool";
-	case ::at::kDouble:
-		return "F64 / at::kDouble";
-	case ::at::kInt:
-		return "I32 / at::kInt";
-	case ::at::kShort:
-		return "I16 / at::kShort";
-	case ::at::kChar:
-		return "I8 / at::kChar";
-	case ::at::kByte:
-		return "U8 / at::kByte";
+	case ::torch::kFloat:
+		return "F32 / torch::kFloat";
+	case ::torch::kHalf:
+		return "F16 / torch::kHalf";
+	case ::torch::kBFloat16:
+		return "BF16 / torch::kBFloat16";
+	case ::torch::kLong:
+		return "I64 / torch::kLong";
+	case ::torch::kBool:
+		return "Bool / torch::kBool";
+	case ::torch::kDouble:
+		return "F64 / torch::kDouble";
+	case ::torch::kInt:
+		return "I32 / torch::kInt";
+	case ::torch::kShort:
+		return "I16 / torch::kShort";
+	case ::torch::kChar:
+		return "I8 / torch::kChar";
+	case ::torch::kByte:
+		return "U8 / torch::kByte";
 	default:
-		return "<unsupported or unknown at::ScalarType>";
+		return "<unsupported or unknown torch::ScalarType>";
 	}
 }
 
@@ -77,7 +77,7 @@ namespace detail
 	return "<unknown Device>";
 }
 
-[[nodiscard]] inline auto tensor_device_name(::at::Tensor const &raw) noexcept
+[[nodiscard]] inline auto tensor_device_name(::torch::Tensor const &raw) noexcept
 	-> char const *
 {
 	if (!raw.defined())
@@ -113,7 +113,7 @@ namespace detail
 	return "<unknown Layout>";
 }
 
-[[nodiscard]] inline auto tensor_layout_name(::at::Tensor const &raw) noexcept
+[[nodiscard]] inline auto tensor_layout_name(::torch::Tensor const &raw) noexcept
 	-> char const *
 {
 	if (!raw.defined())
@@ -148,7 +148,7 @@ inline void print_shape(::std::span<::std::int64_t const> dims) noexcept
 	fast_io::print("]");
 }
 
-inline void print_tensor_shape(::at::Tensor const &raw) noexcept
+inline void print_tensor_shape(::torch::Tensor const &raw) noexcept
 {
 	if (!raw.defined())
 	{
@@ -243,7 +243,7 @@ inline void print_tensor_shape(::at::Tensor const &raw) noexcept
 [[noreturn]] inline void dtype_mismatch(
 	char const *where,
 	DType expected,
-	::at::ScalarType actual) noexcept
+	::torch::ScalarType actual) noexcept
 {
 	fast_io::println(
 		"typetorch contract violation in ",
@@ -259,7 +259,7 @@ inline void print_tensor_shape(::at::Tensor const &raw) noexcept
 [[noreturn]] inline void device_mismatch(
 	char const *where,
 	Device expected,
-	::at::Tensor const &raw) noexcept
+	::torch::Tensor const &raw) noexcept
 {
 	fast_io::println(
 		"typetorch contract violation in ",
@@ -275,7 +275,7 @@ inline void print_tensor_shape(::at::Tensor const &raw) noexcept
 [[noreturn]] inline void layout_mismatch(
 	char const *where,
 	Layout expected,
-	::at::Tensor const &raw) noexcept
+	::torch::Tensor const &raw) noexcept
 {
 	fast_io::println(
 		"typetorch contract violation in ",
@@ -290,7 +290,7 @@ inline void print_tensor_shape(::at::Tensor const &raw) noexcept
 
 [[noreturn]] inline void full_tensor_contract_mismatch(
 	char const *where,
-	::at::Tensor const &raw,
+	::torch::Tensor const &raw,
 	::std::span<::std::int64_t const> expected_shape,
 	DType expected_dtype,
 	Device expected_device,
@@ -358,7 +358,7 @@ inline void print_tensor_shape(::at::Tensor const &raw) noexcept
 	::std::terminate();
 }
 
-inline auto dtype_matches(DType expected, ::at::ScalarType actual) noexcept
+inline auto dtype_matches(DType expected, ::torch::ScalarType actual) noexcept
 	-> bool
 {
 	switch (expected)
@@ -366,21 +366,21 @@ inline auto dtype_matches(DType expected, ::at::ScalarType actual) noexcept
 	case DType::Any:
 		return true;
 	case DType::F32:
-		return actual == ::at::kFloat;
+		return actual == ::torch::kFloat;
 	case DType::F16:
-		return actual == ::at::kHalf;
+		return actual == ::torch::kHalf;
 
 	case DType::BF16:
-		return actual == ::at::kBFloat16;
+		return actual == ::torch::kBFloat16;
 	case DType::I64:
-		return actual == ::at::kLong;
+		return actual == ::torch::kLong;
 	case DType::Bool:
-		return actual == ::at::kBool;
+		return actual == ::torch::kBool;
 	}
 	return false;
 }
 
-inline auto device_matches(Device expected, ::at::Tensor const &raw) noexcept
+inline auto device_matches(Device expected, ::torch::Tensor const &raw) noexcept
 	-> bool
 {
 	switch (expected)
@@ -395,7 +395,7 @@ inline auto device_matches(Device expected, ::at::Tensor const &raw) noexcept
 	return false;
 }
 
-inline auto layout_matches(Layout expected, ::at::Tensor const &raw) noexcept
+inline auto layout_matches(Layout expected, ::torch::Tensor const &raw) noexcept
 	-> bool
 {
 	switch (expected)
@@ -411,7 +411,7 @@ inline auto layout_matches(Layout expected, ::at::Tensor const &raw) noexcept
 }
 
 inline void check_shape_compatible_runtime(
-	::at::Tensor const &raw,
+	::torch::Tensor const &raw,
 	::std::span<::std::int64_t const> dims,
 	char const *where = "Tensor::retain")
 {
@@ -452,7 +452,7 @@ inline void check_shape_compatible_runtime(
 }
 
 inline void check_tensor_compatible_runtime(
-	::at::Tensor const &raw,
+	::torch::Tensor const &raw,
 	::std::span<::std::int64_t const> dims,
 	DType dtype,
 	Device device,

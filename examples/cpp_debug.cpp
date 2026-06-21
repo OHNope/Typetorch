@@ -5,13 +5,13 @@ import fast_io;
 
 namespace
 {
-::at::Tensor tensor(::std::initializer_list<float> values)
+::torch::Tensor tensor(::std::initializer_list<float> values)
 {
-	auto options{::at::TensorOptions().dtype(::at::kFloat).device(::at::kCPU)};
-	return ::at::tensor(values, options);
+	auto options{::torch::TensorOptions().dtype(::torch::kFloat).device(::torch::kCPU)};
+	return ::torch::tensor(values, options);
 }
 
-void print_sizes(::at::Tensor const &x)
+void print_sizes(::torch::Tensor const &x)
 {
 	::fast_io::io::print("[");
 	auto const sizes{x.sizes()};
@@ -26,7 +26,7 @@ void print_sizes(::at::Tensor const &x)
 	::fast_io::io::print("]");
 }
 
-void print_tensor_summary(char const *name, ::at::Tensor const &x)
+void print_tensor_summary(char const *name, ::torch::Tensor const &x)
 {
 	::fast_io::io::print(::std::string_view{name}, ": sizes=");
 	print_sizes(x);
@@ -83,9 +83,9 @@ int main()
 		typetorch::Tensor<typetorch::Shape<2, 3, 4>, typetorch::DType::F32,
 						  typetorch::Device::CPU, typetorch::Layout::Contiguous>;
 
-	auto options{::at::TensorOptions().dtype(::at::kFloat).device(::at::kCPU)};
-	auto matrix_raw{::at::arange(6, options).view({2, 3})};
-	auto cube_raw{::at::arange(24, options).view({2, 3, 4})};
+	auto options{::torch::TensorOptions().dtype(::torch::kFloat).device(::torch::kCPU)};
+	auto matrix_raw{::torch::arange(6, options).view({2, 3})};
+	auto cube_raw{::torch::arange(24, options).view({2, 3, 4})};
 
 	print_tensor_summary("Tensor::empty",
 						 ::std::move(StaticMatrix::empty()).unwrap());
@@ -111,7 +111,7 @@ int main()
 	print_tensor_summary(
 		"add_scalar",
 		::std::move(StaticMatrix::retain(matrix_raw)
-						.add(::at::Scalar{2.0F}))
+						.add(::torch::Scalar{2.0F}))
 			.unwrap());
 	print_tensor_summary(
 		"typed_transpose",
@@ -145,7 +145,7 @@ int main()
 			.contiguous()
 			.unwrap());
 	auto static_vector{StaticVector::retain(
-		::at::arange(6, options).view({6}))};
+		::torch::arange(6, options).view({6}))};
 	::fast_io::io::println("typetorch::sizes: ",
 						   static_vector.sizes().size());
 }

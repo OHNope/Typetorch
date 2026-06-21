@@ -20,7 +20,7 @@ add_requires("libtorch-bin 2.8.0+cu128", {alias = "libtorch"})
 local typetorch_module_files = {
     "src/libtorch.mpp",
     "src/typetorch_types.mpp",
-    "src/typetorch_aten_mappings.mpp",
+    "src/typetorch_torch_mappings.mpp",
     "src/typetorch_shape_meta.mpp",
     "src/typetorch_common.mpp",
     "src/typetorch_runtime_checks.mpp",

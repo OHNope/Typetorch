@@ -15,39 +15,39 @@ namespace typetorch_binary_size_tensor_probe
 using Vector = typetorch::Tensor<typetorch::Shape<typetorch::dyn>,
 								 typetorch::DType::F32, typetorch::Device::CPU,
 								 typetorch::Layout::Any>;
-TYPETORCH_SIZE_NOINLINE auto raw_identity(::at::Tensor const &x) -> ::at::Tensor
+TYPETORCH_SIZE_NOINLINE auto raw_identity(::torch::Tensor const &x) -> ::torch::Tensor
 {
 	return x;
 }
 
-TYPETORCH_SIZE_NOINLINE auto raw_add(::at::Tensor const &a, ::at::Tensor const &b)
-	-> ::at::Tensor
+TYPETORCH_SIZE_NOINLINE auto raw_add(::torch::Tensor const &a, ::torch::Tensor const &b)
+	-> ::torch::Tensor
 {
 	return a.add(b);
 }
 
-TYPETORCH_SIZE_NOINLINE auto raw_numel(::at::Tensor const &x) -> ::std::int64_t
+TYPETORCH_SIZE_NOINLINE auto raw_numel(::torch::Tensor const &x) -> ::std::int64_t
 {
 	return x.numel();
 }
 
 TYPETORCH_SIZE_NOINLINE auto typed_raw_ref(Vector const &x)
-	-> ::at::Tensor const &
+	-> ::torch::Tensor const &
 {
 	return x.unsafe_raw();
 }
 
-TYPETORCH_SIZE_NOINLINE auto typed_retain_checked(::at::Tensor const &x) -> Vector
+TYPETORCH_SIZE_NOINLINE auto typed_retain_checked(::torch::Tensor const &x) -> Vector
 {
 	return Vector::retain(x);
 }
 
-TYPETORCH_SIZE_NOINLINE auto typed_retain_unsafe(::at::Tensor const &x) -> Vector
+TYPETORCH_SIZE_NOINLINE auto typed_retain_unsafe(::torch::Tensor const &x) -> Vector
 {
 	return Vector::unsafe_retain(x);
 }
 
-TYPETORCH_SIZE_NOINLINE auto typed_unwrap(Vector x) -> ::at::Tensor
+TYPETORCH_SIZE_NOINLINE auto typed_unwrap(Vector x) -> ::torch::Tensor
 {
 	return ::std::move(x).unwrap();
 }
@@ -69,9 +69,9 @@ int main()
 {
 	namespace probe = typetorch_binary_size_tensor_probe;
 
-	auto options{::at::TensorOptions().dtype(::at::kFloat).device(::at::kCPU)};
-	auto a{::at::ones({4}, options)};
-	auto b{::at::ones({4}, options)};
+	auto options{::torch::TensorOptions().dtype(::torch::kFloat).device(::torch::kCPU)};
+	auto a{::torch::ones({4}, options)};
+	auto b{::torch::ones({4}, options)};
 
 	auto raw_sum{probe::raw_add(a, b)};
 	auto typed_a{probe::typed_retain_unsafe(a)};

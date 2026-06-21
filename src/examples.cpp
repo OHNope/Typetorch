@@ -35,27 +35,27 @@ using StaticCubeIdentity =
 					typetorch::Device::CPU, typetorch::Layout::Contiguous>;
 
 static_assert(::std::is_same_v<decltype(Vector::retain(
-								   ::std::declval<::at::Tensor const &>())),
+								   ::std::declval<::torch::Tensor const &>())),
 							   Vector>);
 static_assert(::std::is_same_v<decltype(Vector::unsafe_retain(
-								   ::std::declval<::at::Tensor const &>())),
+								   ::std::declval<::torch::Tensor const &>())),
 							   Vector>);
 static_assert(::std::is_same_v<decltype(Vector::unsafe_move(
-								   ::std::declval<::at::Tensor>())),
+								   ::std::declval<::torch::Tensor>())),
 							   Vector>);
 static_assert(::std::is_same_v<decltype(Vector::retain(
-								   ::std::declval<::at::Tensor const &>())),
+								   ::std::declval<::torch::Tensor const &>())),
 							   Vector>);
 static_assert(::std::is_same_v<decltype(::std::declval<Vector const &>().unsafe_raw()),
-							   ::at::Tensor const &>);
+							   ::torch::Tensor const &>);
 static_assert(::std::is_same_v<decltype(::std::declval<Vector &&>().unwrap()),
-							   ::at::Tensor>);
+							   ::torch::Tensor>);
 
 static_assert(::std::is_same_v<decltype(::std::declval<Matrix const &>().add(
 								   ::std::declval<Vector const &>())),
 							   Matrix>);
 static_assert(::std::is_same_v<decltype(::std::declval<Vector const &>().add(
-								   ::std::declval<::at::Scalar const &>())),
+								   ::std::declval<::torch::Scalar const &>())),
 							   Vector>);
 static_assert(
 	::std::is_same_v<decltype(::std::declval<Matrix3In const &>().matmul(
@@ -97,7 +97,7 @@ static_assert(::std::is_same_v<
 							  typetorch::Device::CPU,
 							  typetorch::Layout::Contiguous>>);
 
-::at::Tensor fixed_linear_weight();
+::torch::Tensor fixed_linear_weight();
 
 } // namespace detail
 
@@ -105,7 +105,7 @@ SizeVector checked_vector_sizes(Vector const &x)
 {
 	auto sizes{x.unsafe_raw().sizes().vec()};
 	return SizeVector::unsafe_move(
-		::at::tensor(sizes, x.unsafe_raw().options().dtype(::at::kLong).device(::at::kCPU)));
+		::torch::tensor(sizes, x.unsafe_raw().options().dtype(::torch::kLong).device(::torch::kCPU)));
 }
 
 Vector add_vectors(Vector const &a, Vector const &b)
@@ -143,10 +143,10 @@ Matrix transpose_matrix(Matrix const &x)
 namespace detail
 {
 
-::at::Tensor fixed_linear_weight()
+::torch::Tensor fixed_linear_weight()
 {
-	auto options{::at::TensorOptions().dtype(::at::kFloat).device(::at::kCPU)};
-	return ::at::tensor({0.5F, 0.5F, 0.0F, 0.0F, 1.5F, 0.5F}, options).view({2, 3});
+	auto options{::torch::TensorOptions().dtype(::torch::kFloat).device(::torch::kCPU)};
+	return ::torch::tensor({0.5F, 0.5F, 0.0F, 0.0F, 1.5F, 0.5F}, options).view({2, 3});
 }
 
 } // namespace detail
