@@ -2,6 +2,9 @@
 
 #define TYPETORCH_ATTR
 
+#pragma once
+
+
 // GCC,Clang
 #if defined(__GNUC__) || defined(__CLANG__)
 #define TYPETORCH_ALWAYS_INLINE __attribute__((always_inline)) inline

@@ -104,7 +104,8 @@ local typetorch_module_files = {
     "src/typetorch_common.mpp",
     "src/typetorch_runtime_checks.mpp",
     "src/typetorch_tensor.mpp",
-    "src/typetorch.mpp"
+    "src/typetorch.mpp",
+    "src/components/typetorch_containers.mpp"
 }
 
 local typetorch_examples_module_files = {
@@ -360,6 +361,9 @@ target("typetorch_capi_ext")
     add_files("bindings/python.mpp")
     add_files("bindings/torch_python.mpp")
     add_files("bindings/capi_bridge.mpp")
+    add_files("bindings/capi_python_cast.mpp")
+    add_files("bindings/capi_invoke.mpp")
+    add_files("bindings/capi_reflect_namespace.mpp")
     add_files("bindings/capi_module.cpp")
     add_files("src/typetorch_capi_reflect.mpp")
 

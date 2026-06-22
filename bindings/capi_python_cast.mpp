@@ -1,0 +1,184 @@
+export module typetorch.capi_python_cast;
+
+import std;
+import libtorch;
+import python;
+import torch_python;
+import typetorch;
+
+export namespace typetorch_capi::reflect
+{
+
+template <typename Arg>
+using parsed_arg_t = ::std::remove_cvref_t<Arg>;
+
+inline auto parse_tensor(python::PyObject *object, ::std::size_t index)
+	-> ::std::optional<::torch::Tensor>
+{
+	if (!torch_python::tensor_check(object))
+	{
+		python::PyErr_Format(python::type_error(),
+							 "argument %lu must be a torch.Tensor",
+							 static_cast<unsigned long>(index));
+		return ::std::nullopt;
+	}
+	return torch_python::tensor_unpack(object);
+}
+
+inline auto parse_string_view(python::PyObject *object, ::std::size_t index)
+	-> ::std::optional<::std::string_view>
+{
+	python::Py_ssize_t size{};
+	auto *data{python::PyUnicode_AsUTF8AndSize(object, &size)};
+	if (!data)
+	{
+		python::PyErr_Format(python::type_error(), "argument %lu must be a string",
+							 static_cast<unsigned long>(index));
+		return ::std::nullopt;
+	}
+	return ::std::string_view{data, static_cast<::std::size_t>(size)};
+}
+
+// don't forget to remove cvref before calling it!
+// TODO: Wating for pattern matching
+template <typename Arg>
+inline auto parse_arg(python::PyObject *object, ::std::size_t index)
+	-> ::std::optional<parsed_arg_t<Arg>>
+{
+	if constexpr (typetorch::TensorLike<Arg>)
+	{
+		auto tensor{parse_tensor(object, index)};
+		if (!tensor)
+		{
+			return ::std::nullopt;
+		}
+		return Arg::retain(::std::move(*tensor));
+	}
+	else if constexpr (::std::is_same_v<Arg, ::torch::Tensor>)
+	{
+		return parse_tensor(object, index);
+	}
+	else if constexpr (::std::is_same_v<Arg, bool>)
+	{
+		auto value{python::PyObject_IsTrue(object)};
+		if (value < 0)
+		{
+			return ::std::nullopt;
+		}
+		return value != 0;
+	}
+	else if constexpr (::std::is_integral_v<Arg> && ::std::is_signed_v<Arg>)
+	{
+		auto value{python::PyLong_AsLongLong(object)};
+		if (value == -1 && python::PyErr_Occurred())
+		{
+			python::PyErr_Format(python::type_error(),
+								 "argument %lu must be an integer",
+								 static_cast<unsigned long>(index));
+			return ::std::nullopt;
+		}
+		return static_cast<Arg>(value);
+	}
+	else if constexpr (::std::is_integral_v<Arg> && ::std::is_unsigned_v<Arg>)
+	{
+		auto value{python::PyLong_AsUnsignedLongLong(object)};
+		if (value == static_cast<unsigned long long>(-1) &&
+			python::PyErr_Occurred())
+		{
+			python::PyErr_Format(python::type_error(),
+								 "argument %lu must be a non-negative integer",
+								 static_cast<unsigned long>(index));
+			return ::std::nullopt;
+		}
+		return static_cast<Arg>(value);
+	}
+	else if constexpr (::std::is_floating_point_v<Arg>)
+	{
+		auto value{python::PyFloat_AsDouble(object)};
+		if (value == -1.0 && python::PyErr_Occurred())
+		{
+			python::PyErr_Format(python::type_error(),
+								 "argument %lu must be a floating-point number",
+								 static_cast<unsigned long>(index));
+			return ::std::nullopt;
+		}
+		return static_cast<Arg>(value);
+	}
+	else if constexpr (::std::is_same_v<Arg, ::std::string_view>)
+	{
+		return parse_string_view(object, index);
+	}
+	else if constexpr (::std::is_same_v<Arg, ::std::string>)
+	{
+		auto text{parse_string_view(object, index)};
+		if (!text)
+		{
+			return ::std::nullopt;
+		}
+		return ::std::string{text->data(), text->size()};
+	}
+	else if constexpr (::std::is_same_v<Arg, char const *>)
+	{
+		auto text{parse_string_view(object, index)};
+		if (!text)
+		{
+			return ::std::nullopt;
+		}
+		return text->data();
+	}
+	else
+	{
+		static_assert(false, "Unsupported reflected Python argument");
+	}
+}
+
+template <typename Result>
+inline auto to_python(Result &&result) -> python::PyObject *
+{
+	using Bare = ::std::remove_cvref_t<Result>;
+	if constexpr (typetorch::TensorLike<Bare>)
+	{
+		return torch_python::tensor_wrap(::std::move(result).unwrap());
+	}
+	else if constexpr (::std::is_same_v<Bare, ::torch::Tensor>)
+	{
+		return torch_python::tensor_wrap(::std::forward<Result>(result));
+	}
+	else if constexpr (::std::is_same_v<Bare, bool>)
+	{
+		return python::PyBool_FromLong(result ? 1 : 0);
+	}
+	else if constexpr (::std::is_integral_v<Bare> && ::std::is_signed_v<Bare>)
+	{
+		return python::PyLong_FromLongLong(static_cast<long long>(result));
+	}
+	else if constexpr (::std::is_integral_v<Bare> && ::std::is_unsigned_v<Bare>)
+	{
+		return python::PyLong_FromUnsignedLongLong(
+			static_cast<unsigned long long>(result));
+	}
+	else if constexpr (::std::is_floating_point_v<Bare>)
+	{
+		return python::PyFloat_FromDouble(static_cast<double>(result));
+	}
+	else if constexpr (::std::is_same_v<Bare, ::std::string> ||
+					   ::std::is_same_v<Bare, ::std::string_view>)
+	{
+		return python::PyUnicode_FromStringAndSize(
+			result.data(), static_cast<python::Py_ssize_t>(result.size()));
+	}
+	else if constexpr (::std::is_same_v<Bare, char const *> ||
+					   ::std::is_same_v<Bare, char *>)
+	{
+		return python::PyUnicode_FromStringAndSize(
+			result ? result : "", static_cast<python::Py_ssize_t>(
+									  result ? ::std::char_traits<char>::length(result)
+											 : 0));
+	}
+	else
+	{
+		static_assert(false, "Unsupported reflected Python result");
+	}
+}
+
+} // namespace typetorch_capi::reflect

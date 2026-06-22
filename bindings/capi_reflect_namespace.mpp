@@ -1,0 +1,37 @@
+export module typetorch.capi_reflect_namespace;
+
+import std;
+import typetorch.capi_bridge;
+import typetorch.capi_invoke;
+
+export namespace typetorch_capi::reflect
+{
+
+consteval inline auto members_of_namespace(::std::meta::info Namespace) noexcept
+{
+	constexpr auto context{::std::meta::access_context::unchecked()};
+	return ::std::define_static_array(
+		::std::meta::members_of(Namespace, context));
+}
+
+template <::std::meta::info Namespace>
+inline void visit_namespace_functions(typetorch_python_visit_fn visit,
+									  void *user) noexcept
+{
+	if (!visit)
+	{
+		return;
+	}
+
+	static constexpr auto members{members_of_namespace(Namespace)};
+	template for (constexpr auto member : members)
+	{
+		if constexpr (::std::meta::is_function(member))
+		{
+			::std::string name{::std::meta::identifier_of(member)};
+			visit_function<([:member:])>(name.c_str(), visit, user);
+		}
+	}
+}
+
+} // namespace typetorch_capi::reflect

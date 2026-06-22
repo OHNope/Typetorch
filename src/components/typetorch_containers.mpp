@@ -1,8 +1,9 @@
 export module typetorch:containers;
 
 import libtorch;
-import :type;
+import :types;
 import :tensor;
+import std;
 
 #ifndef TYPETORCH_UNUSED
 #ifdef __CUDACC__
@@ -12,82 +13,118 @@ import :tensor;
 #endif
 #endif
 
-#ifndef TYPETORCH_SMARTPTR
-#define TYPETORCH_SMARTPTR
-#define TYPETORCH_MODULE_IMPL(Name, ImplType)                  \
-	class Name : public torch::nn::ModuleHolder<ImplType>      \
-	{                                                          \
-	public:                                                    \
-		using torch::nn::ModuleHolder<ImplType>::ModuleHolder; \
-		using Impl TYPETORCH_UNUSED = ImplType;                \
-	}
-#define TYPETORCH_MODULE(Name) TYPETORCH_MODULE_IMPL(Name, Name##Impl)
-#endif
-
 export namespace typetorch
 {
 
 namespace detail
 {
-template <class T>
-consteval auto member_names()
+
+template <::std::size_t const N>
+consteval inline auto make_index_array()
 {
-	constexpr auto ctx = std::meta::access_context::current();
+	::std::array<std::size_t, N> a{};
 
-	constexpr std::size_t N =
-		std::meta::nonstatic_data_members_of(^^T, ctx).size();
-
-	auto members =
-		std::meta::nonstatic_data_members_of(^^T, ctx);
-
-	std::array<std::string_view, N> names{};
-
-	for (std::size_t i = 0; i < N; ++i)
+	for (std::size_t i{0}; i < N; ++i)
 	{
-		names[i] = std::meta::identifier_of(members[i]);
+		a[i] = i;
 	}
 
-	return names;
+	return a;
+}
+consteval inline auto member_nums(::std::meta::info const class_info) noexcept
+{
+	constexpr auto ctx{std::meta::access_context::current()};
+	return std::meta::nonstatic_data_members_of(class_info, ctx).size();
+}
+consteval inline auto member_ptrs(::std::meta::info const class_info) noexcept
+{
+	constexpr auto ctx{std::meta::access_context::current()};
+	return std::meta::nonstatic_data_members_of(class_info, ctx);
 }
 
+template <::std::meta::info ClassInfo>
+consteval inline auto member_names() noexcept
+{
+	constexpr auto members{member_ptrs(ClassInfo)};
+	constexpr std::size_t N{members.size()};
+
+	std::array<std::string_view, N> result{};
+
+	for (std::size_t i{0}; i < N; ++i)
+	{
+		result[i] = std::meta::identifier_of(members[i]);
+	}
+
+	return result;
+}
+
+template <::std::int64_t out, bool with_bias = true>
+struct BiasImpl
+{
+	Tensor<Shape<out>> bias;
+};
+
+template <::std::int64_t Ignored>
+struct BiasImpl<Ignored, false>
+{
+};
+// TODO: forward performance comparison
 template <::std::int64_t in, ::std::int64_t out, bool with_bias = true>
-struct LinearImpl : torch::nn::Module
+struct LinearImpl : torch::nn::Module, BiasImpl<out, with_bias>
 {
 	LinearImpl()
 	{
-		weight = register_parameter(
-			"weight",
-			torch::randn({out, in}));
+		constexpr auto names{member_names<^^LinearImpl>()};
+		constexpr auto members{member_ptrs(^^LinearImpl)};
+		constexpr std::size_t N{member_nums(^^LinearImpl)};
 
+		::std::array<torch::Tensor, N> tensors;
 		if constexpr (with_bias)
 		{
-			bias = register_parameter(
-				"bias",
-				torch::randn({out}));
+			tensors = ::std::array<torch::Tensor, N>{
+				::torch::randn({out, in}), ::torch::randn({out})};
 		}
-	}
-
-	inline auto forward(torch::Tensor const &x)
-	{
-		// x:      [..., in_features]
-		// weight: [out_features, in_features]
-		// weight.t(): [in_features, out_features]
-		auto y = x.matmul(weight.t());
-
-		if (bias.defined())
+		else
 		{
-			y = y + bias;
-		}
+			tensors = ::std::array<torch::Tensor, N>{
+				::torch::randn({out, in})};
+		};
 
-		return y;
+		template for (constexpr ::std::size_t index : make_index_array<N>())
+		{
+			this->[:members[index]:] = register_parameter(names[index], tensors[index]);
+		};
 	}
+	/* 	inline auto
+		forward(::typetorch::Tensor const &x)
+		{
+			// x:      [..., in_features]
+			// weight: [out_features, in_features]
+			// weight.t(): [in_features, out_features]
+			auto y{x.matmul(weight.t())};
 
-	static constexpr ::std::int64_t in_features_{in};
-	static constexpr ::std::int64_t out_features_{out};
+			if constexpr (with_bias)
+			{
+				y = y + bias;
+			}
 
-	Tensor<Shape<out, in>> weight;
-	Tensor<Shape<out>> bias;
+			return y;
+		} */
+	Tensor<Shape<out, in>>
+		weight;
 };
+
+template <::std::int64_t in, ::std::int64_t out, bool with_bias = true>
+class Linear : public torch::nn::ModuleHolder<LinearImpl<in, out, with_bias>>
+{
+	using LnImpl = LinearImpl<in, out, with_bias>;
+
+public:
+	using torch::nn::ModuleHolder<LnImpl>::ModuleHolder;
+	using Impl TYPETORCH_UNUSED = LnImpl;
+};
+
+
 } // namespace detail
 
 } // namespace typetorch
