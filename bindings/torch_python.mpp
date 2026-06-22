@@ -1,28 +1,39 @@
 module;
 
-#define PY_SSIZE_T_CLEAN
-#include <Python.h>
-#include <torch/csrc/autograd/python_variable.h>
-#include <torch/torch.h>
+// 注意：这里不用 PyObject，不声明 _object，避免和 python module 冲突。
+// 全部用 void* 穿过 C ABI 边界。
+extern "C" bool typetorch_thp_tensor_check(void *object) noexcept;
+extern "C" void typetorch_thp_tensor_unpack(void *object, void *out_tensor);
+extern "C" void *typetorch_thp_tensor_wrap(void *tensor);
 
 export module torch_python;
 
+import libtorch;
+import python;
+
 export namespace torch_python
 {
-using ::PyObject;
+
+using python::PyObject;
 using Tensor = ::torch::Tensor;
-inline auto tensor_check(PyObject *object) -> bool
+
+inline auto tensor_check(PyObject *object) noexcept -> bool
 {
-	return ::THPVariable_Check(object) != 0;
+	return ::typetorch_thp_tensor_check(static_cast<void *>(object));
 }
 
 inline auto tensor_unpack(PyObject *object) -> Tensor
 {
-	return ::THPVariable_Unpack(object);
+	Tensor tensor;
+	::typetorch_thp_tensor_unpack(static_cast<void *>(object),
+								  static_cast<void *>(&tensor));
+	return tensor;
 }
 
 inline auto tensor_wrap(Tensor tensor) -> PyObject *
 {
-	return ::THPVariable_Wrap(tensor);
+	return static_cast<PyObject *>(
+		::typetorch_thp_tensor_wrap(static_cast<void *>(&tensor)));
 }
+
 } // namespace torch_python

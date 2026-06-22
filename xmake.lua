@@ -360,6 +360,7 @@ target("typetorch_capi_ext")
 
     add_files("bindings/python.mpp")
     add_files("bindings/torch_python.mpp")
+    add_files("bindings/torch_python.cpp")
     add_files("bindings/capi_bridge.mpp")
     add_files("bindings/capi_python_cast.mpp")
     add_files("bindings/capi_invoke.mpp")
