@@ -100,6 +100,65 @@ of a contiguous tensor, the result type should keep that information.
 | Tensor copying | `torch::Tensor` is a copyable reference-counted handle | `Tensor<...>` is move-only to keep boundary transitions explicit. |
 | Raw access | Raw tensor is the primary API | `unsafe_raw()` is available, but typed functions should preserve contracts. |
 
+
+
+## Operation Quick Reference
+
+### Factory (no input tensor)
+| Method | Static Shape Required | Notes |
+| --- | :---: | --- |
+| `empty()` | Yes | Uninitialized |
+| `zeros()` | Yes | All zeros |
+| `ones()` | Yes | All ones |
+| `rand()` | Yes | Uniform [0,1) |
+| `randn()` | Yes | Normal(0,1) |
+| `arange<N>()` | Partially | Shape computed from args |
+
+### Arithmetic (tensor-tensor, tensor-scalar)
+| Method | Shape Rule |
+| --- | --- |
+| `add(other, alpha=1)` | Broadcast |
+| `sub(other, alpha=1)` | Broadcast |
+| `mul(other)` | Broadcast |
+| `div(other)` | Broadcast |
+| `matmul(other)` | Inner dim match + batch broadcast |
+
+### View / Shape (consume `this` via `&&`)
+| Method | Notes |
+| --- | --- |
+| `transpose<D0, D1>()` | Layout degrades unless identity |
+| `permute<Dims...>()` | Layout preserved only for identity |
+| `view<Dims...>()` | Requires Contiguous; supports `infer` |
+| `reshape<Dims...>()` | Auto-contiguous for NonContiguous |
+| `flatten<S, E>()` | StartDim, EndDim (default: all) |
+| `squeeze()` / `squeeze<Dim>()` | Removes dims of size 1 |
+| `unsqueeze<Dim>()` | Inserts dim of size 1 |
+| `contiguous()` | Copies to contiguous if needed |
+
+### NN (selected)
+| Method | Notes |
+| --- | --- |
+| `relu()` / `relu_()` | In-place variant available |
+| `gelu(approx)` / `gelu_()` | Requires floating dtype |
+| `softmax(dim)` | Requires floating dtype |
+| `layer_norm<Dims...>(eps)` | Normalized shape must match trailing dims |
+| `layer_norm(weight, bias, eps)` | Same, with affine params |
+| `rms_norm<Dims...>()` | Same shape rules as layer_norm |
+| `masked_fill(mask, value)` | Mask must be Bool dtype |
+
+### Aggregate / Condition
+| Method | Notes |
+| --- | --- |
+| `where(cond, x, y)` | Static 3-argument; cond must be Bool |
+| `cat<Dim>(first, rest...)` | Same rank, cat dim summed |
+| `stack<Dim>(first, rest...)` | Same shape, new dim inserted |
+
+### Conversion
+| Method | Notes |
+| --- | --- |
+| `to<Device, DType>()` | Device and/or dtype conversion |
+| `clone()` | Deep copy |
+
 ## Current Operation Coverage
 
 The core wrapper currently covers selected arithmetic, matrix, shape, factory,

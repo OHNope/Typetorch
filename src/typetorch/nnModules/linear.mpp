@@ -1,0 +1,120 @@
+export module typetorch:nnModules_linear;
+
+import std;
+import libtorch;
+import :types;
+import :torch_mappings;
+import :shape_meta;
+import :common;
+import :tensor;
+import :nnModules_core;
+
+export namespace typetorch
+{
+
+namespace detail
+{
+
+template <::std::int64_t In, ::std::int64_t Out,
+		  DType dtype = DType::F32, Device device = Device::CPU>
+struct TypedLinearImpl : ::torch::nn::LinearImpl
+{
+	static_assert(In >= 0, "Linear in_features must be non-negative");
+	static_assert(Out >= 0, "Linear out_features must be non-negative");
+	static_assert(dtype != DType::Any,
+				  "Linear parameters require a concrete dtype");
+	static_assert(device != Device::Any,
+				  "Linear parameters require a concrete device");
+	static_assert(::typetorch::detail::is_floating_dtype(dtype),
+				  "Linear parameters require a floating dtype");
+
+	explicit TypedLinearImpl(bool with_bias = true)
+		: ::torch::nn::LinearImpl(
+			  ::torch::nn::LinearOptions(In, Out).bias(with_bias))
+	{
+	}
+
+	template <TensorLike Input>
+	[[nodiscard]] inline auto forward(Input const &x)
+	{
+		using InputShape = typename Input::shape;
+		using ResultShape =
+			typename[:linear_shape_meta(InputShape::dims, In, Out):];
+		using Result =
+			Tensor<ResultShape, common_dtype(Input::dtype, dtype),
+				   common_device(Input::device, device), Layout::Any>;
+
+		return Result::unsafe_move(
+			::torch::nn::LinearImpl::forward(x.unsafe_raw()));
+	}
+
+	template <Device ndevice, DType ndtype = dtype>
+	[[nodiscard]] inline auto to() const
+	{
+		auto result{
+			::std::make_shared<TypedLinearImpl<In, Out, ndtype, ndevice>>(
+				this->options.bias())};
+		result->weight.set_data(weight.to(container_options<ndtype, ndevice>()));
+		if (bias.defined())
+		{
+			result->bias.set_data(bias.to(container_options<ndtype, ndevice>()));
+		}
+		return result;
+	}
+
+	template <DType ndtype>
+	[[nodiscard]] inline auto to() const
+	{
+		return to<device, ndtype>();
+	}
+
+	[[nodiscard]] inline auto typed_weight() const
+	{
+		using Weight = Tensor<Shape<Out, In>, dtype, device>;
+		return Weight::unsafe_retain(weight);
+	}
+
+	[[nodiscard]] inline auto typed_bias() const
+	{
+		using Bias = Tensor<Shape<Out>, dtype, device>;
+		return Bias::unsafe_retain(bias);
+	}
+
+	[[nodiscard]] static inline auto parameter_options()
+	{
+		return container_options<dtype, device>();
+	}
+
+	static constexpr ::std::int64_t in_features{In};
+	static constexpr ::std::int64_t out_features{Out};
+	static constexpr DType dtype_kind{dtype};
+	static constexpr Device device_kind{device};
+};
+
+} // namespace detail
+
+template <::std::int64_t In, ::std::int64_t Out,
+		  DType dtype = DType::F32, Device device = Device::CPU>
+class Linear
+	: public ::torch::nn::ModuleHolder<
+		  detail::TypedLinearImpl<In, Out, dtype, device>>
+{
+public:
+	using Impl = detail::TypedLinearImpl<In, Out, dtype, device>;
+	using ::torch::nn::ModuleHolder<Impl>::ModuleHolder;
+
+	template <Device ndevice, DType ndtype = dtype>
+	[[nodiscard]] inline auto to() const
+	{
+		return Linear<In, Out, ndtype, ndevice>{
+			this->ptr()->template to<ndevice, ndtype>()};
+	}
+
+	template <DType ndtype>
+	[[nodiscard]] inline auto to() const
+	{
+		return to<device, ndtype>();
+	}
+};
+
+} // namespace typetorch

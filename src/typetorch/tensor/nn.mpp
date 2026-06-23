@@ -7,11 +7,12 @@ import :tensor_core;
 export namespace typetorch
 {
 
-// relu
-template <ShapeLike ShapeKind, DType DTypeKind, Device DeviceKind, Layout LayoutKind>
-[[nodiscard]] inline auto Tensor<ShapeKind, DTypeKind, DeviceKind, LayoutKind>::relu() const
+// relu(input)
+template <TensorLike Input>
+[[nodiscard]] inline auto relu(Input const &input)
 {
-    return unsafe_move(unsafe_raw().relu());
+    using Result = Tensor<typename Input::shape, Input::dtype, Input::device, Input::layout>;
+    return Result::unsafe_move(input.unsafe_raw().relu());
 }
 
 // relu_
@@ -21,13 +22,14 @@ inline void Tensor<ShapeKind, DTypeKind, DeviceKind, LayoutKind>::relu_()
     unsafe_raw().relu_();
 }
 
-// gelu
-template <ShapeLike ShapeKind, DType DTypeKind, Device DeviceKind, Layout LayoutKind>
-[[nodiscard]] inline auto Tensor<ShapeKind, DTypeKind, DeviceKind, LayoutKind>::gelu(::c10::string_view approximate) const
+// gelu(input)
+template <TensorLike Input>
+[[nodiscard]] inline auto gelu(Input const &input, ::c10::string_view approximate = "none")
 {
-    static_assert(DTypeKind == DType::Any || detail::is_floating_dtype(DTypeKind),
-                  "Tensor::gelu() requires floating tensor dtype");
-    return unsafe_move(::torch::gelu(unsafe_raw(), approximate));
+    static_assert(Input::dtype == DType::Any || detail::is_floating_dtype(Input::dtype),
+                  "gelu() requires floating tensor dtype");
+    using Result = Tensor<typename Input::shape, Input::dtype, Input::device, Input::layout>;
+    return Result::unsafe_move(::torch::gelu(input.unsafe_raw(), approximate));
 }
 
 // gelu_
@@ -40,140 +42,27 @@ inline void Tensor<ShapeKind, DTypeKind, DeviceKind, LayoutKind>::gelu_(::c10::s
     ::torch::gelu_(raw, approximate);
 }
 
-// softmax(dim)
-template <ShapeLike ShapeKind, DType DTypeKind, Device DeviceKind, Layout LayoutKind>
-[[nodiscard]] inline auto Tensor<ShapeKind, DTypeKind, DeviceKind, LayoutKind>::softmax(::std::int64_t const dim) const
+// softmax(input, dim)
+template <TensorLike Input>
+[[nodiscard]] inline auto softmax(Input const &input, ::std::int64_t const dim)
 {
-    static_assert(DTypeKind == DType::Any || detail::is_floating_dtype(DTypeKind),
-                  "Tensor::softmax() requires floating tensor dtype");
-    return unsafe_move(unsafe_raw().softmax(dim));
+    static_assert(Input::dtype == DType::Any || detail::is_floating_dtype(Input::dtype),
+                  "softmax() requires floating tensor dtype");
+    using Result = Tensor<typename Input::shape, Input::dtype, Input::device, Input::layout>;
+    return Result::unsafe_move(input.unsafe_raw().softmax(dim));
 }
 
-// softmax(integral_constant)
-template <ShapeLike ShapeKind, DType DTypeKind, Device DeviceKind, Layout LayoutKind>
-template <auto Dim>
-[[nodiscard]] inline auto Tensor<ShapeKind, DTypeKind, DeviceKind, LayoutKind>::softmax(
-    ::std::integral_constant<decltype(Dim), Dim>) const
+// softmax(input, integral_constant)
+template <TensorLike Input, auto Dim>
+[[nodiscard]] inline auto softmax(
+    Input const &input, ::std::integral_constant<decltype(Dim), Dim>)
     requires(::std::integral<decltype(Dim)>)
 {
-    static_assert(DTypeKind == DType::Any || detail::is_floating_dtype(DTypeKind),
-                  "Tensor::softmax() requires floating tensor dtype");
-    return unsafe_move(
-        unsafe_raw().softmax(static_cast<::std::int64_t>(Dim)));
-}
-
-// layer_norm(NormalizedDims...)
-template <ShapeLike ShapeKind, DType DTypeKind, Device DeviceKind, Layout LayoutKind>
-template <::std::int64_t... NormalizedDims>
-[[nodiscard]] inline auto Tensor<ShapeKind, DTypeKind, DeviceKind, LayoutKind>::layer_norm(double const eps, bool const cudnn_enable) const
-{
-    static_assert(sizeof...(NormalizedDims) > 0,
-                  "Tensor::layer_norm() requires a non-empty normalized shape");
-    static_assert(DTypeKind == DType::Any || detail::is_floating_dtype(DTypeKind),
-                  "Tensor::layer_norm() requires floating tensor dtype");
-    using NormalizedShape = Shape<NormalizedDims...>;
-    static_assert(NORMALIZED_SHAPE_COMPATIBLE(ShapeKind, NormalizedShape),
-                  "normalized_shape must match the trailing input dimensions");
-    constexpr ::std::int64_t normalized_shape[]{NormalizedDims...};
-    using Result = Tensor<ShapeKind, DTypeKind, DeviceKind, Layout::Any>;
-    return Result::unsafe_move(::torch::layer_norm(
-        unsafe_raw(), normalized_shape, {},
-        {}, eps, cudnn_enable));
-}
-
-// layer_norm(weight, bias)
-template <ShapeLike ShapeKind, DType DTypeKind, Device DeviceKind, Layout LayoutKind>
-template <TensorLike Weight, TensorLike Bias>
-[[nodiscard]] inline auto Tensor<ShapeKind, DTypeKind, DeviceKind, LayoutKind>::layer_norm(Weight const &weight, Bias const &bias, double const eps, bool const cudnn_enable) const
-{
-    static_assert(DTypeKind == DType::Any || detail::is_floating_dtype(DTypeKind),
-                  "Tensor::layer_norm() requires floating tensor dtype");
-    using NormalizedShape = typename Weight::shape;
-    using BiasShape = typename Bias::shape;
-    static_assert(detail::same_shape(NormalizedShape::dims, BiasShape::dims),
-                  "layer_norm weight and bias must have the same shape");
-    static_assert(NORMALIZED_SHAPE_COMPATIBLE(ShapeKind, NormalizedShape),
-                  "weight shape must match the trailing input dimensions");
-    using Result =
-        Tensor<ShapeKind, DTypeKind,
-               common_device(common_device(DeviceKind, Weight::device), Bias::device),
-               Layout::Any>;
-    return Result::unsafe_move(::torch::layer_norm(
-        unsafe_raw(), NormalizedShape::dims,
-        weight.unsafe_raw(),
-        bias.unsafe_raw(), eps, cudnn_enable));
-}
-
-// rms_norm(NormalizedDims...)
-template <ShapeLike ShapeKind, DType DTypeKind, Device DeviceKind, Layout LayoutKind>
-template <::std::int64_t... NormalizedDims>
-[[nodiscard]] inline auto Tensor<ShapeKind, DTypeKind, DeviceKind, LayoutKind>::rms_norm() const
-{
-    static_assert(sizeof...(NormalizedDims) > 0,
-                  "Tensor::rms_norm() requires a non-empty normalized shape");
-    static_assert(DTypeKind == DType::Any || detail::is_floating_dtype(DTypeKind),
-                  "Tensor::rms_norm() requires floating tensor dtype");
-    using NormalizedShape = Shape<NormalizedDims...>;
-    static_assert(NORMALIZED_SHAPE_COMPATIBLE(ShapeKind, NormalizedShape),
-                  "normalized_shape must match the trailing input dimensions");
-    constexpr ::std::int64_t normalized_shape[]{NormalizedDims...};
-    using Result = Tensor<ShapeKind, DTypeKind, DeviceKind, Layout::Any>;
-    return Result::unsafe_move(::torch::rms_norm(
-        unsafe_raw(), normalized_shape));
-}
-
-// rms_norm(NormalizedDims..., eps)
-template <ShapeLike ShapeKind, DType DTypeKind, Device DeviceKind, Layout LayoutKind>
-template <::std::int64_t... NormalizedDims>
-[[nodiscard]] inline auto Tensor<ShapeKind, DTypeKind, DeviceKind, LayoutKind>::rms_norm(double const eps) const
-{
-    static_assert(sizeof...(NormalizedDims) > 0,
-                  "Tensor::rms_norm() requires a non-empty normalized shape");
-    static_assert(DTypeKind == DType::Any || detail::is_floating_dtype(DTypeKind),
-                  "Tensor::rms_norm() requires floating tensor dtype");
-    using NormalizedShape = Shape<NormalizedDims...>;
-    static_assert(NORMALIZED_SHAPE_COMPATIBLE(ShapeKind, NormalizedShape),
-                  "normalized_shape must match the trailing input dimensions");
-    constexpr ::std::int64_t normalized_shape[]{NormalizedDims...};
-    using Result = Tensor<ShapeKind, DTypeKind, DeviceKind, Layout::Any>;
-    return Result::unsafe_move(::torch::rms_norm(
-        unsafe_raw(), normalized_shape, {},
-        eps));
-}
-
-// rms_norm(weight)
-template <ShapeLike ShapeKind, DType DTypeKind, Device DeviceKind, Layout LayoutKind>
-template <TensorLike Weight>
-[[nodiscard]] inline auto Tensor<ShapeKind, DTypeKind, DeviceKind, LayoutKind>::rms_norm(Weight const &weight) const
-{
-    static_assert(DTypeKind == DType::Any || detail::is_floating_dtype(DTypeKind),
-                  "Tensor::rms_norm() requires floating tensor dtype");
-    using NormalizedShape = typename Weight::shape;
-    static_assert(NORMALIZED_SHAPE_COMPATIBLE(ShapeKind, NormalizedShape),
-                  "weight shape must match the trailing input dimensions");
-    using Result = Tensor<ShapeKind, DTypeKind, common_device(DeviceKind, Weight::device),
-                          Layout::Any>;
-    return Result::unsafe_move(::torch::rms_norm(
-        unsafe_raw(), NormalizedShape::dims,
-        weight.unsafe_raw()));
-}
-
-// rms_norm(weight, eps)
-template <ShapeLike ShapeKind, DType DTypeKind, Device DeviceKind, Layout LayoutKind>
-template <TensorLike Weight>
-[[nodiscard]] inline auto Tensor<ShapeKind, DTypeKind, DeviceKind, LayoutKind>::rms_norm(Weight const &weight, double const eps) const
-{
-    static_assert(DTypeKind == DType::Any || detail::is_floating_dtype(DTypeKind),
-                  "Tensor::rms_norm() requires floating tensor dtype");
-    using NormalizedShape = typename Weight::shape;
-    static_assert(NORMALIZED_SHAPE_COMPATIBLE(ShapeKind, NormalizedShape),
-                  "weight shape must match the trailing input dimensions");
-    using Result = Tensor<ShapeKind, DTypeKind, common_device(DeviceKind, Weight::device),
-                          Layout::Any>;
-    return Result::unsafe_move(::torch::rms_norm(
-        unsafe_raw(), NormalizedShape::dims,
-        weight.unsafe_raw(),
-        eps));
+    static_assert(Input::dtype == DType::Any || detail::is_floating_dtype(Input::dtype),
+                  "softmax() requires floating tensor dtype");
+    using Result = Tensor<typename Input::shape, Input::dtype, Input::device, Input::layout>;
+    return Result::unsafe_move(
+        input.unsafe_raw().softmax(static_cast<::std::int64_t>(Dim)));
 }
 
 // masked_fill

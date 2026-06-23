@@ -1,0 +1,133 @@
+export module typetorch:nnModules_layer_norm;
+
+import std;
+import libtorch;
+import :types;
+import :torch_mappings;
+import :shape_meta;
+import :common;
+import :tensor;
+import :nnModules_core;
+
+export namespace typetorch
+{
+
+namespace detail
+{
+
+template <ShapeLike NormalizedShape, DType dtype = DType::F32,
+		  Device device = Device::CPU>
+struct TypedLayerNormImpl : ::torch::nn::LayerNormImpl
+{
+	static_assert(NormalizedShape::rank > 0,
+				  "LayerNorm requires a non-empty normalized shape");
+	static_assert(dtype != DType::Any,
+				  "LayerNorm parameters require a concrete dtype");
+	static_assert(device != Device::Any,
+				  "LayerNorm parameters require a concrete device");
+	static_assert(::typetorch::detail::is_floating_dtype(dtype),
+				  "LayerNorm parameters require a floating dtype");
+
+	explicit TypedLayerNormImpl(double eps = 1e-5, bool elementwise_affine = true,
+								bool cudnn_enable = true)
+		: ::torch::nn::LayerNormImpl(
+			  ::torch::nn::LayerNormOptions(
+				  ::std::vector<::std::int64_t>(
+					  NormalizedShape::dims.begin(), NormalizedShape::dims.end()))
+				  .eps(eps)
+				  .elementwise_affine(elementwise_affine)),
+		  cudnn_enable_{cudnn_enable}
+	{
+		if (weight.defined())
+			weight.set_data(weight.to(parameter_options()));
+		if (bias.defined())
+			bias.set_data(bias.to(parameter_options()));
+	}
+
+	template <TensorLike Input>
+	[[nodiscard]] inline auto forward(Input const &x)
+	{
+		static_assert(Input::dtype == DType::Any ||
+						  ::typetorch::detail::is_floating_dtype(Input::dtype),
+					  "LayerNorm input requires floating tensor dtype");
+		using InputShape = typename Input::shape;
+		static_assert(
+			normalized_shape_compatible(InputShape::dims, NormalizedShape::dims),
+			"LayerNorm normalized_shape must match trailing input dimensions");
+		using Result =
+			Tensor<InputShape, common_dtype(Input::dtype, dtype),
+				   common_device(Input::device, device), Layout::Any>;
+		return Result::unsafe_move(::torch::layer_norm(
+			x.unsafe_raw(), NormalizedShape::dims, weight, bias,
+			this->options.eps(),
+			cudnn_enable_));
+	}
+
+	template <Device ndevice, DType ndtype = dtype>
+	[[nodiscard]] inline auto to() const
+	{
+		auto result{
+			::std::make_shared<TypedLayerNormImpl<NormalizedShape, ndtype, ndevice>>(
+				this->options.eps(), this->options.elementwise_affine(),
+				cudnn_enable_)};
+		if (weight.defined())
+		{
+			result->weight.set_data(weight.to(container_options<ndtype, ndevice>()));
+			result->bias.set_data(bias.to(container_options<ndtype, ndevice>()));
+		}
+		return result;
+	}
+
+	template <DType ndtype>
+	[[nodiscard]] inline auto to() const
+	{
+		return to<device, ndtype>();
+	}
+
+	[[nodiscard]] inline auto typed_weight() const
+	{
+		using Weight = Tensor<NormalizedShape, dtype, device>;
+		return Weight::unsafe_retain(weight);
+	}
+
+	[[nodiscard]] inline auto typed_bias() const
+	{
+		using Bias = Tensor<NormalizedShape, dtype, device>;
+		return Bias::unsafe_retain(bias);
+	}
+
+	[[nodiscard]] static inline auto parameter_options()
+	{
+		return container_options<dtype, device>();
+	}
+
+	bool cudnn_enable_{true};
+};
+
+} // namespace detail
+
+template <ShapeLike NormalizedShape, DType dtype = DType::F32,
+		  Device device = Device::CPU>
+class LayerNorm
+	: public ::torch::nn::ModuleHolder<
+		  detail::TypedLayerNormImpl<NormalizedShape, dtype, device>>
+{
+public:
+	using Impl = detail::TypedLayerNormImpl<NormalizedShape, dtype, device>;
+	using ::torch::nn::ModuleHolder<Impl>::ModuleHolder;
+
+	template <Device ndevice, DType ndtype = dtype>
+	[[nodiscard]] inline auto to() const
+	{
+		return LayerNorm<NormalizedShape, ndtype, ndevice>{
+			this->ptr()->template to<ndevice, ndtype>()};
+	}
+
+	template <DType ndtype>
+	[[nodiscard]] inline auto to() const
+	{
+		return to<device, ndtype>();
+	}
+};
+
+} // namespace typetorch

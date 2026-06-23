@@ -1,0 +1,110 @@
+export module typetorch:nnModules_embedding;
+
+import std;
+import libtorch;
+import :types;
+import :torch_mappings;
+import :shape_meta;
+import :common;
+import :tensor;
+import :nnModules_core;
+
+export namespace typetorch
+{
+
+namespace detail
+{
+
+template <::std::int64_t NumEmbeddings, ::std::int64_t EmbeddingDim,
+		  DType dtype = DType::F32, Device device = Device::CPU>
+struct TypedEmbeddingImpl : ::torch::nn::EmbeddingImpl
+{
+	static_assert(NumEmbeddings >= 0,
+				  "Embedding num_embeddings must be non-negative");
+	static_assert(EmbeddingDim >= 0,
+				  "Embedding embedding_dim must be non-negative");
+	static_assert(dtype != DType::Any,
+				  "Embedding parameters require a concrete dtype");
+	static_assert(device != Device::Any,
+				  "Embedding parameters require a concrete device");
+	static_assert(::typetorch::detail::is_floating_dtype(dtype),
+				  "Embedding parameters require a floating dtype");
+
+	TypedEmbeddingImpl()
+		: ::torch::nn::EmbeddingImpl(
+			  ::torch::nn::EmbeddingOptions(NumEmbeddings, EmbeddingDim))
+	{
+		weight.set_data(weight.to(parameter_options()));
+	}
+
+	template <TensorLike Indices>
+	[[nodiscard]] inline auto forward(Indices const &indices)
+	{
+		static_assert(Indices::dtype == DType::Any || Indices::dtype == DType::I64,
+					  "Embedding input indices must be int64 tensors");
+		using IndexShape = typename Indices::shape;
+		using ResultShape =
+			typename[:embedding_shape_meta(IndexShape::dims, EmbeddingDim):];
+		using Result =
+			Tensor<ResultShape, dtype, common_device(Indices::device, device),
+				   Layout::Any>;
+		return Result::unsafe_move(
+			::torch::nn::EmbeddingImpl::forward(indices.unsafe_raw()));
+	}
+
+	template <Device ndevice, DType ndtype = dtype>
+	[[nodiscard]] inline auto to() const
+	{
+		auto result{
+			::std::make_shared<
+				TypedEmbeddingImpl<NumEmbeddings, EmbeddingDim, ndtype, ndevice>>()};
+		result->weight.set_data(weight.to(container_options<ndtype, ndevice>()));
+		return result;
+	}
+
+	template <DType ndtype>
+	[[nodiscard]] inline auto to() const
+	{
+		return to<device, ndtype>();
+	}
+
+	[[nodiscard]] inline auto typed_weight() const
+	{
+		using Weight = Tensor<Shape<NumEmbeddings, EmbeddingDim>, dtype, device>;
+		return Weight::unsafe_retain(weight);
+	}
+
+	[[nodiscard]] static inline auto parameter_options()
+	{
+		return container_options<dtype, device>();
+	}
+};
+
+} // namespace detail
+
+template <::std::int64_t NumEmbeddings, ::std::int64_t EmbeddingDim,
+		  DType dtype = DType::F32, Device device = Device::CPU>
+class Embedding
+	: public ::torch::nn::ModuleHolder<
+		  detail::TypedEmbeddingImpl<NumEmbeddings, EmbeddingDim, dtype, device>>
+{
+public:
+	using Impl =
+		detail::TypedEmbeddingImpl<NumEmbeddings, EmbeddingDim, dtype, device>;
+	using ::torch::nn::ModuleHolder<Impl>::ModuleHolder;
+
+	template <Device ndevice, DType ndtype = dtype>
+	[[nodiscard]] inline auto to() const
+	{
+		return Embedding<NumEmbeddings, EmbeddingDim, ndtype, ndevice>{
+			this->ptr()->template to<ndevice, ndtype>()};
+	}
+
+	template <DType ndtype>
+	[[nodiscard]] inline auto to() const
+	{
+		return to<device, ndtype>();
+	}
+};
+
+} // namespace typetorch

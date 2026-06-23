@@ -8,5 +8,5 @@ export import :torch_mappings;
 export import :shape_meta;
 export import :common;
 export import :tensor;
-export import :containers;
+export import :nnModules;
 export import :runtime_checks;

@@ -183,39 +183,9 @@ public:
     [[nodiscard]] static inline auto randn() -> Tensor;
 
     // ====== NN methods — defined in :tensor_nn ======
-    [[nodiscard]] inline auto relu() const;
     inline void relu_();
 
-    [[nodiscard]] inline auto gelu(::c10::string_view approximate = "none") const;
     inline void gelu_(::c10::string_view approximate = "none");
-
-    [[nodiscard]] inline auto softmax(::std::int64_t const dim) const;
-
-    template <auto Dim>
-    [[nodiscard]] inline auto softmax(
-        ::std::integral_constant<decltype(Dim), Dim>) const
-        requires(::std::integral<decltype(Dim)>);
-
-    template <::std::int64_t... NormalizedDims>
-    [[nodiscard]] inline auto layer_norm(double const eps = 1e-5,
-                                         bool const cudnn_enable = true) const;
-
-    template <TensorLike Weight, TensorLike Bias>
-    [[nodiscard]] inline auto layer_norm(Weight const &weight, Bias const &bias,
-                                         double const eps = 1e-5,
-                                         bool const cudnn_enable = true) const;
-
-    template <::std::int64_t... NormalizedDims>
-    [[nodiscard]] inline auto rms_norm() const;
-
-    template <::std::int64_t... NormalizedDims>
-    [[nodiscard]] inline auto rms_norm(double const eps) const;
-
-    template <TensorLike Weight>
-    [[nodiscard]] inline auto rms_norm(Weight const &weight) const;
-
-    template <TensorLike Weight>
-    [[nodiscard]] inline auto rms_norm(Weight const &weight, double const eps) const;
 
     template <TensorLike Mask>
     [[nodiscard]] inline auto masked_fill(Mask const &mask,

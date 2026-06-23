@@ -93,7 +93,12 @@ local typetorch_module_files = {
     "src/typetorch/tensor/view.mpp",
     "src/typetorch/tensor/nn.mpp",
     "src/typetorch/tensor/tensor.mpp",
-    "src/typetorch/containers/containers.mpp",
+    "src/typetorch/nnModules/core.mpp",
+    "src/typetorch/nnModules/linear.mpp",
+    "src/typetorch/nnModules/embedding.mpp",
+    "src/typetorch/nnModules/layer_norm.mpp",
+    "src/typetorch/nnModules/rms_norm.mpp",
+    "src/typetorch/nnModules/nnModules.mpp",
     "src/typetorch/typetorch.mpp"
 }
 

@@ -1,0 +1,107 @@
+export module typetorch:nnModules_core;
+
+import std;
+import libtorch;
+import :types;
+import :torch_mappings;
+import :shape_meta;
+import :common;
+import :tensor;
+
+export namespace typetorch
+{
+
+namespace detail
+{
+
+template <::std::size_t const N>
+consteval inline auto make_index_array()
+{
+	::std::array<::std::size_t, N> a{};
+
+	for (::std::size_t i{0}; i < N; ++i)
+	{
+		a[i] = i;
+	}
+
+	return a;
+}
+
+consteval inline auto member_nums(::std::meta::info const class_info) noexcept
+{
+	constexpr auto ctx{::std::meta::access_context::current()};
+	return ::std::meta::nonstatic_data_members_of(class_info, ctx).size();
+}
+
+consteval inline auto member_ptrs(::std::meta::info const class_info) noexcept
+{
+	constexpr auto ctx{::std::meta::access_context::current()};
+	return ::std::meta::nonstatic_data_members_of(class_info, ctx);
+}
+
+template <::std::meta::info ClassInfo>
+consteval inline auto member_names() noexcept
+{
+	constexpr auto members{member_ptrs(ClassInfo)};
+	constexpr ::std::size_t N{members.size()};
+
+	::std::array<::std::string_view, N> result{};
+
+	for (::std::size_t i{0}; i < N; ++i)
+	{
+		result[i] = ::std::meta::identifier_of(members[i]);
+	}
+
+	return result;
+}
+
+template <DType dtype, Device device>
+inline auto container_options()
+	-> ::torch::TensorOptions
+{
+	return ::torch::TensorOptions{}
+		.dtype(::typetorch::detail::to_torch_dtype(dtype))
+		.device(::typetorch::detail::to_torch_device(device));
+}
+
+consteval inline auto linear_shape_meta(::std::span<::std::int64_t const> dims,
+										::std::int64_t in,
+										::std::int64_t out)
+	-> ::std::meta::info
+{
+	if (dims.empty())
+	{
+		throw "Linear input rank must be >= 1";
+	}
+	if (!(dims.back() == dyn || in == dyn || dims.back() == in))
+	{
+		throw "Linear input last dimension must match in_features";
+	}
+
+	::std::vector<::std::meta::info> args;
+	args.reserve(dims.size());
+	for (::std::size_t i{0}; i + 1 < dims.size(); ++i)
+	{
+		args.push_back(::std::meta::reflect_constant(dims[i]));
+	}
+	args.push_back(::std::meta::reflect_constant(out));
+	return ::std::meta::substitute(^^Shape, args);
+}
+
+consteval inline auto embedding_shape_meta(::std::span<::std::int64_t const> dims,
+										   ::std::int64_t embedding_dim)
+	-> ::std::meta::info
+{
+	::std::vector<::std::meta::info> args;
+	args.reserve(dims.size() + 1);
+	for (::std::int64_t dim : dims)
+	{
+		args.push_back(::std::meta::reflect_constant(dim));
+	}
+	args.push_back(::std::meta::reflect_constant(embedding_dim));
+	return ::std::meta::substitute(^^Shape, args);
+}
+
+} // namespace detail
+
+} // namespace typetorch
