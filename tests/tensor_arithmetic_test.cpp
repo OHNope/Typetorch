@@ -202,7 +202,7 @@ int main()
 									NormBias::retain(norm_bias_raw))
 						.unsafe_raw(),
 					::torch::layer_norm(matrix_raw(), {3}, norm_weight_raw,
-									 norm_bias_raw));
+										norm_bias_raw));
 	expect_allclose("rms_norm_static",
 					Matrix::retain(matrix_raw()).rms_norm<3>().unsafe_raw(),
 					::torch::rms_norm(matrix_raw(), {3}));

@@ -82,24 +82,24 @@ add_requires("libtorch-bin 2.8.0+cu128", {alias = "libtorch"})
 
 local typetorch_module_files = {
     "src/libtorch.mpp",
-    "src/typetorch_types.mpp",
-    "src/typetorch_torch_mappings.mpp",
-    "src/typetorch_shape_meta.mpp",
-    "src/typetorch_common.mpp",
-    "src/typetorch_runtime_checks.mpp",
-    "src/typetorch_tensor_core.mpp",
-    "src/typetorch_tensor_factory.mpp",
-    "src/typetorch_tensor_arithmetic.mpp",
-    "src/typetorch_tensor_view.mpp",
-    "src/typetorch_tensor_nn.mpp",
-    "src/typetorch_tensor.mpp",
-    "src/components/typetorch_containers.mpp",
-    "src/typetorch.mpp"
+    "src/typetorch/types.mpp",
+    "src/typetorch/torch_mappings.mpp",
+    "src/typetorch/shape_meta.mpp",
+    "src/typetorch/common.mpp",
+    "src/typetorch/runtime_checks.mpp",
+    "src/typetorch/tensor/core.mpp",
+    "src/typetorch/tensor/factory.mpp",
+    "src/typetorch/tensor/arithmetic.mpp",
+    "src/typetorch/tensor/view.mpp",
+    "src/typetorch/tensor/nn.mpp",
+    "src/typetorch/tensor/tensor.mpp",
+    "src/typetorch/containers/containers.mpp",
+    "src/typetorch/typetorch.mpp"
 }
 
 local typetorch_examples_module_files = {
-    "src/typetorch_examples.mpp",
-    "src/examples.cpp",
+    "src/examples/typetorch_examples.mpp",
+    "src/examples/examples.cpp",
 }
 
 local function add_typetorch_modules()
@@ -242,6 +242,7 @@ local function configure_libtorch_target(config)
     set_kind(config.kind or "binary")
     add_rules("libtorch_runtime", config.python_rule or "python_headers")
     add_packages("libtorch")
+    add_includedirs("src")
     if config.torch_python then
         add_links("torch_python")
     end
@@ -331,15 +332,15 @@ target("typetorch_capi_ext")
         root_includedir = true,
         examples = true,
         files = {
-            "bindings/python.mpp",
-            "bindings/torch_python.mpp",
-            "bindings/torch_python.cpp",
-            "bindings/capi_bridge.mpp",
-            "bindings/capi_python_cast.mpp",
-            "bindings/capi_invoke.mpp",
-            "bindings/capi_reflect_namespace.mpp",
-            "bindings/capi_module.cpp",
-            "src/typetorch_capi_reflect.mpp",
+            "src/bindings/python.mpp",
+            "src/bindings/torch_python.mpp",
+            "src/bindings/torch_python.cpp",
+            "src/bindings/capi_bridge.mpp",
+            "src/bindings/capi_python_cast.mpp",
+            "src/bindings/capi_invoke.mpp",
+            "src/bindings/capi_reflect_namespace.mpp",
+            "src/bindings/capi_module.cpp",
+            "src/bindings/capi_reflect.mpp",
         },
     })
     set_prefixname("")

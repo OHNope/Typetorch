@@ -1,4 +1,4 @@
-#include "../attributes.inc"
+#include "attributes.inc"
 
 #ifndef TYPETORCH_SMARTPTR
 

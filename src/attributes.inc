@@ -25,4 +25,10 @@
 #define TYPETORCH_UNUSED [[maybe_unused]]
 #endif
 
+#if defined(__GNUC__) || defined(__clang__)
+#define TYPETORCH_SIZE_NOINLINE __attribute__((noinline, used))
+#else
+#define TYPETORCH_SIZE_NOINLINE
+#endif
+
 #endif

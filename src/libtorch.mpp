@@ -47,6 +47,13 @@ using ::torch::where;
 using ::torch::zeros;
 namespace nn
 {
+using ::torch::nn::Cloneable;
+using ::torch::nn::EmbeddingImpl;
+using ::torch::nn::EmbeddingOptions;
+using ::torch::nn::LayerNormImpl;
+using ::torch::nn::LayerNormOptions;
+using ::torch::nn::LinearImpl;
+using ::torch::nn::LinearOptions;
 using ::torch::nn::Module;
 using ::torch::nn::ModuleHolder;
 } // namespace nn

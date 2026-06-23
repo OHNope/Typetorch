@@ -9,9 +9,8 @@ export namespace typetorch
 namespace detail
 {
 
-consteval inline auto
-broadcast_compatible(::std::span<::std::int64_t const> ldims,
-					 ::std::span<::std::int64_t const> rdims) noexcept -> bool
+consteval inline auto broadcast_compatible(::std::span<::std::int64_t const> ldims,
+										   ::std::span<::std::int64_t const> rdims) noexcept -> bool
 {
 	::std::size_t const lrank{ldims.size()};
 	::std::size_t const rrank{rdims.size()};

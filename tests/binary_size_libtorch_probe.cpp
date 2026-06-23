@@ -2,11 +2,7 @@ import std;
 import libtorch;
 import fast_io;
 
-#if defined(__GNUC__) || defined(__clang__)
-#define TYPETORCH_SIZE_NOINLINE __attribute__((noinline, used))
-#else
-#define TYPETORCH_SIZE_NOINLINE
-#endif
+#include "../src/attributes.inc"
 
 namespace typetorch_binary_size_libtorch_probe
 {
