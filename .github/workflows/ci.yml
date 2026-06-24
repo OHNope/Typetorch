@@ -22,8 +22,60 @@ env:
   XMAKE_ROOT: "y"
 
 jobs:
+  changes:
+    name: Detect CI-relevant changes
+    runs-on: ubuntu-24.04
+    outputs:
+      run: ${{ steps.changes.outputs.run }}
+    steps:
+      - name: Check out repository history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect CI-relevant changes
+        id: changes
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            base="$BASE_SHA"
+          else
+            base="$BEFORE_SHA"
+          fi
+
+          if [ -z "$base" ] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          run=false
+          while IFS= read -r path; do
+            case "$path" in
+              README.md|LICENSE|AGENTS.md|docs/*|.vscode/*|\
+              .gitignore|.clang-format|.clangd)
+                ;;
+              *)
+                run=true
+                break
+                ;;
+            esac
+          done < <(git diff --name-only "$base" "$HEAD_SHA")
+
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+
   environment:
     name: Environment probe
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-24.04
     container:
       image: gcc:16
@@ -34,15 +86,7 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Decide whether to run
-        id: ci
-        uses: ./.github/actions/ci-should-run
-        with:
-          marker-path: .ci-success/environment
-          cache-key: ${{ runner.os }}-gcc16-ci-success-environment-${{ hashFiles('.github/workflows/ci.yml', '.github/actions/**', 'xmake.lua', 'scripts/**', 'packages/**') }}
-
       - name: Install system packages
-        if: steps.ci.outputs.run == 'true'
         run: |
           apt-get update
           apt-get install -y --no-install-recommends \
@@ -51,7 +95,6 @@ jobs:
           rm -rf /var/lib/apt/lists/*
 
       - name: Cache xmake installation
-        if: steps.ci.outputs.run == 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -63,7 +106,6 @@ jobs:
             ${{ runner.os }}-gcc16-xmake-install-
 
       - name: Install xmake
-        if: steps.ci.outputs.run == 'true'
         run: |
           export PATH="$HOME/.local/bin:$PATH"
           if ! command -v xmake >/dev/null 2>&1; then
@@ -73,27 +115,20 @@ jobs:
           xmake --version
 
       - name: Configure Python include path
-        if: steps.ci.outputs.run == 'true'
         run: |
           echo "PYTHON=$PYTHON" >> "$GITHUB_ENV"
           python_include="$($PYTHON -c 'import sysconfig; print(sysconfig.get_path("include"))')"
           echo "PYTHON_INCLUDE_DIR=$python_include" >> "$GITHUB_ENV"
 
       - name: Check environment
-        if: steps.ci.outputs.run == 'true'
         run: |
           source scripts/env.sh
           bash scripts/check_env.sh
 
-      - name: Save successful ci result
-        if: steps.ci.outputs.run == 'true' && steps.ci.outputs.cache-hit != 'true'
-        uses: ./.github/actions/save-ci-success
-        with:
-          marker-path: .ci-success/environment
-          cache-key: ${{ steps.ci.outputs.cache-primary-key }}
-
   core-tests:
     name: Build and run core C++ tests
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-24.04
     container:
       image: gcc:16
@@ -104,15 +139,7 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Decide whether to run
-        id: ci
-        uses: ./.github/actions/ci-should-run
-        with:
-          marker-path: .ci-success/core-tests
-          cache-key: ${{ runner.os }}-gcc16-ci-success-core-tests-${{ hashFiles('.github/workflows/ci.yml', '.github/actions/**', 'xmake.lua', 'scripts/env.sh', 'scripts/bootstrap_xmake.sh', 'packages/l/libtorch-bin/xmake.lua', 'src/**', 'third_party/fast_io/**', 'examples/**', 'tests/tensor_arithmetic_test.cpp') }}
-
       - name: Install system packages
-        if: steps.ci.outputs.run == 'true'
         run: |
           apt-get update
           apt-get install -y --no-install-recommends \
@@ -121,7 +148,6 @@ jobs:
           rm -rf /var/lib/apt/lists/*
 
       - name: Cache xmake installation
-        if: steps.ci.outputs.run == 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -133,7 +159,6 @@ jobs:
             ${{ runner.os }}-gcc16-xmake-install-
 
       - name: Cache xmake packages
-        if: steps.ci.outputs.run == 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -143,8 +168,18 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gcc16-xmake-
 
+      - name: Cache xmake build outputs
+        uses: actions/cache@v4
+        with:
+          path: |
+            .xmake
+            build
+          key: ${{ runner.os }}-gcc16-core-build-${{ hashFiles('xmake.lua', 'packages/**/xmake.lua', 'scripts/env.sh') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-gcc16-core-build-${{ hashFiles('xmake.lua', 'packages/**/xmake.lua', 'scripts/env.sh') }}-
+            ${{ runner.os }}-gcc16-core-build-
+
       - name: Install xmake
-        if: steps.ci.outputs.run == 'true'
         run: |
           export PATH="$HOME/.local/bin:$PATH"
           if ! command -v xmake >/dev/null 2>&1; then
@@ -154,51 +189,40 @@ jobs:
           xmake --version
 
       - name: Configure Python include path
-        if: steps.ci.outputs.run == 'true'
         run: |
           echo "PYTHON=$PYTHON" >> "$GITHUB_ENV"
           python_include="$($PYTHON -c 'import sysconfig; print(sysconfig.get_path("include"))')"
           echo "PYTHON_INCLUDE_DIR=$python_include" >> "$GITHUB_ENV"
 
       - name: Configure debug build
-        if: steps.ci.outputs.run == 'true'
         run: |
           source scripts/env.sh
           xmake f -m debug --yes --python="$PYTHON"
 
       - name: Build typetorch_cpp_debug
-        if: steps.ci.outputs.run == 'true'
         run: |
           source scripts/env.sh
           xmake build -j "$BUILD_JOBS" typetorch_cpp_debug
 
       - name: Run typetorch_cpp_debug
-        if: steps.ci.outputs.run == 'true'
         run: |
           source scripts/env.sh
           xmake run typetorch_cpp_debug
 
       - name: Build tensor arithmetic test
-        if: steps.ci.outputs.run == 'true'
         run: |
           source scripts/env.sh
           xmake build -j "$BUILD_JOBS" typetorch_tensor_arithmetic_test
 
       - name: Run tensor arithmetic test
-        if: steps.ci.outputs.run == 'true'
         run: |
           source scripts/env.sh
           xmake run typetorch_tensor_arithmetic_test
 
-      - name: Save successful ci result
-        if: steps.ci.outputs.run == 'true' && steps.ci.outputs.cache-hit != 'true'
-        uses: ./.github/actions/save-ci-success
-        with:
-          marker-path: .ci-success/core-tests
-          cache-key: ${{ steps.ci.outputs.cache-primary-key }}
-
   capi-extension:
     name: Build Python C API extension
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-24.04
     container:
       image: gcc:16
@@ -209,15 +233,7 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Decide whether to run
-        id: ci
-        uses: ./.github/actions/ci-should-run
-        with:
-          marker-path: .ci-success/capi-extension
-          cache-key: ${{ runner.os }}-gcc16-ci-success-capi-extension-${{ hashFiles('.github/workflows/ci.yml', '.github/actions/**', 'xmake.lua', 'scripts/env.sh', 'scripts/bootstrap_xmake.sh', 'packages/l/libtorch-bin/xmake.lua', 'src/**', 'third_party/fast_io/**', 'bindings/**') }}
-
       - name: Install system packages
-        if: steps.ci.outputs.run == 'true'
         run: |
           apt-get update
           apt-get install -y --no-install-recommends \
@@ -226,7 +242,6 @@ jobs:
           rm -rf /var/lib/apt/lists/*
 
       - name: Cache xmake installation
-        if: steps.ci.outputs.run == 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -238,7 +253,6 @@ jobs:
             ${{ runner.os }}-gcc16-xmake-install-
 
       - name: Cache xmake packages
-        if: steps.ci.outputs.run == 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -248,8 +262,18 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gcc16-xmake-
 
+      - name: Cache xmake build outputs
+        uses: actions/cache@v4
+        with:
+          path: |
+            .xmake
+            build
+          key: ${{ runner.os }}-gcc16-capi-build-${{ hashFiles('xmake.lua', 'packages/**/xmake.lua', 'scripts/env.sh') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-gcc16-capi-build-${{ hashFiles('xmake.lua', 'packages/**/xmake.lua', 'scripts/env.sh') }}-
+            ${{ runner.os }}-gcc16-capi-build-
+
       - name: Install xmake
-        if: steps.ci.outputs.run == 'true'
         run: |
           export PATH="$HOME/.local/bin:$PATH"
           if ! command -v xmake >/dev/null 2>&1; then
@@ -259,33 +283,25 @@ jobs:
           xmake --version
 
       - name: Configure Python include path
-        if: steps.ci.outputs.run == 'true'
         run: |
           echo "PYTHON=$PYTHON" >> "$GITHUB_ENV"
           python_include="$($PYTHON -c 'import sysconfig; print(sysconfig.get_path("include"))')"
           echo "PYTHON_INCLUDE_DIR=$python_include" >> "$GITHUB_ENV"
 
       - name: Configure debug build
-        if: steps.ci.outputs.run == 'true'
         run: |
           source scripts/env.sh
           xmake f -m debug --yes --python="$PYTHON"
 
       - name: Build Python C API extension
-        if: steps.ci.outputs.run == 'true'
         run: |
           source scripts/env.sh
           xmake build -j "$BUILD_JOBS" typetorch_capi_ext
 
-      - name: Save successful ci result
-        if: steps.ci.outputs.run == 'true' && steps.ci.outputs.cache-hit != 'true'
-        uses: ./.github/actions/save-ci-success
-        with:
-          marker-path: .ci-success/capi-extension
-          cache-key: ${{ steps.ci.outputs.cache-primary-key }}
-
   probes:
     name: Build and run size probes
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-24.04
     container:
       image: gcc:16
@@ -296,15 +312,7 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Decide whether to run
-        id: ci
-        uses: ./.github/actions/ci-should-run
-        with:
-          marker-path: .ci-success/probes
-          cache-key: ${{ runner.os }}-gcc16-ci-success-probes-${{ hashFiles('.github/workflows/ci.yml', '.github/actions/**', 'xmake.lua', 'scripts/env.sh', 'scripts/bootstrap_xmake.sh', 'scripts/check_env.sh', 'scripts/nm_size_probe.sh', 'packages/l/libtorch-bin/xmake.lua', 'src/**', 'third_party/fast_io/**', 'tests/binary_size_*') }}
-
       - name: Install system packages
-        if: steps.ci.outputs.run == 'true'
         run: |
           apt-get update
           apt-get install -y --no-install-recommends \
@@ -313,7 +321,6 @@ jobs:
           rm -rf /var/lib/apt/lists/*
 
       - name: Cache xmake installation
-        if: steps.ci.outputs.run == 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -325,7 +332,6 @@ jobs:
             ${{ runner.os }}-gcc16-xmake-install-
 
       - name: Cache xmake packages
-        if: steps.ci.outputs.run == 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -335,8 +341,18 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gcc16-xmake-
 
+      - name: Cache xmake build outputs
+        uses: actions/cache@v4
+        with:
+          path: |
+            .xmake
+            build
+          key: ${{ runner.os }}-gcc16-probes-build-${{ hashFiles('xmake.lua', 'packages/**/xmake.lua', 'scripts/env.sh') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-gcc16-probes-build-${{ hashFiles('xmake.lua', 'packages/**/xmake.lua', 'scripts/env.sh') }}-
+            ${{ runner.os }}-gcc16-probes-build-
+
       - name: Install xmake
-        if: steps.ci.outputs.run == 'true'
         run: |
           export PATH="$HOME/.local/bin:$PATH"
           if ! command -v xmake >/dev/null 2>&1; then
@@ -346,39 +362,30 @@ jobs:
           xmake --version
 
       - name: Configure Python include path
-        if: steps.ci.outputs.run == 'true'
         run: |
           echo "PYTHON=$PYTHON" >> "$GITHUB_ENV"
           python_include="$($PYTHON -c 'import sysconfig; print(sysconfig.get_path("include"))')"
           echo "PYTHON_INCLUDE_DIR=$python_include" >> "$GITHUB_ENV"
 
       - name: Configure debug build
-        if: steps.ci.outputs.run == 'true'
         run: |
           source scripts/env.sh
           xmake f -m debug --yes --python="$PYTHON"
 
       - name: Check environment
-        if: steps.ci.outputs.run == 'true'
         run: |
           source scripts/env.sh
           bash scripts/check_env.sh
 
       - name: Run size probes
-        if: steps.ci.outputs.run == 'true'
         run: |
           source scripts/env.sh
           bash scripts/nm_size_probe.sh debug
 
-      - name: Save successful ci result
-        if: steps.ci.outputs.run == 'true' && steps.ci.outputs.cache-hit != 'true'
-        uses: ./.github/actions/save-ci-success
-        with:
-          marker-path: .ci-success/probes
-          cache-key: ${{ steps.ci.outputs.cache-primary-key }}
-
   package-consumer:
     name: Test add_requires() package consumption
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-24.04
     container:
       image: gcc:16
@@ -389,22 +396,13 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Decide whether to run
-        id: ci
-        uses: ./.github/actions/ci-should-run
-        with:
-          marker-path: .ci-success/package-consumer
-          cache-key: ${{ runner.os }}-gcc16-ci-success-package-consumer-${{ hashFiles('.github/workflows/ci.yml', '.github/actions/**', 'xmake.lua', 'xmake_package.lua', 'scripts/**', 'packages/**', 'src/**', 'third_party/fast_io/**', 'tests/package-consumer/**') }}
-
       - name: Install system packages
-        if: steps.ci.outputs.run == 'true'
         run: |
           apt-get update
           apt-get install -y --no-install-recommends             ca-certificates curl unzip git file binutils             python3 python3-dev python3-venv pkg-config
           rm -rf /var/lib/apt/lists/*
 
       - name: Cache xmake installation
-        if: steps.ci.outputs.run == 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -416,7 +414,6 @@ jobs:
             ${{ runner.os }}-gcc16-xmake-install-
 
       - name: Cache xmake packages
-        if: steps.ci.outputs.run == 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -426,8 +423,18 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gcc16-xmake-
 
+      - name: Cache package-consumer build outputs
+        uses: actions/cache@v4
+        with:
+          path: |
+            tests/package-consumer/.xmake
+            tests/package-consumer/build
+          key: ${{ runner.os }}-gcc16-package-consumer-build-${{ hashFiles('xmake.lua', 'xmake_package.lua', 'packages/**/xmake.lua', 'tests/package-consumer/xmake.lua', 'scripts/env.sh') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-gcc16-package-consumer-build-${{ hashFiles('xmake.lua', 'xmake_package.lua', 'packages/**/xmake.lua', 'tests/package-consumer/xmake.lua', 'scripts/env.sh') }}-
+            ${{ runner.os }}-gcc16-package-consumer-build-
+
       - name: Install xmake
-        if: steps.ci.outputs.run == 'true'
         run: |
           export PATH="$HOME/.local/bin:$PATH"
           if ! command -v xmake >/dev/null 2>&1; then
@@ -437,24 +444,14 @@ jobs:
           xmake --version
 
       - name: Configure Python include path
-        if: steps.ci.outputs.run == 'true'
         run: |
           echo "PYTHON=$PYTHON" >> "$GITHUB_ENV"
           python_include="$($PYTHON -c 'import sysconfig; print(sysconfig.get_path("include"))')"
           echo "PYTHON_INCLUDE_DIR=$python_include" >> "$GITHUB_ENV"
 
       - name: Build and run package consumer test
-        if: steps.ci.outputs.run == 'true'
         run: |
           source scripts/env.sh
-          rm -rf tests/package-consumer/.xmake tests/package-consumer/build
           xmake f -P tests/package-consumer -m debug --yes
           xmake build -P tests/package-consumer -j "$BUILD_JOBS" package_consumer
           xmake run -P tests/package-consumer package_consumer
-
-      - name: Save successful ci result
-        if: steps.ci.outputs.run == 'true' && steps.ci.outputs.cache-hit != 'true'
-        uses: ./.github/actions/save-ci-success
-        with:
-          marker-path: .ci-success/package-consumer
-          cache-key: ${{ steps.ci.outputs.cache-primary-key }}
