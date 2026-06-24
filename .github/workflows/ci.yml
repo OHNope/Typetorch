@@ -215,9 +215,8 @@ jobs:
       - name: Build C++ test targets
         run: |
           source scripts/env.sh
-          xmake build -j "$BUILD_JOBS" \
-            typetorch_cpp_debug \
-            typetorch_tensor_arithmetic_test
+          xmake build -j "$BUILD_JOBS" typetorch_cpp_debug
+          xmake build -j "$BUILD_JOBS" typetorch_tensor_arithmetic_test
 
       - name: Run C++ tests
         run: |
