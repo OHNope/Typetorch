@@ -12,7 +12,7 @@ ignore.txt
 gcm.cache/
 .cache/
 backups/
-error.log
+**/error.log
 .temp_env/
 AGENTS.md
 scripts/env.local.sh

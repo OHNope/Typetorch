@@ -67,266 +67,118 @@ using Matrix = typetorch::Tensor<typetorch::Shape<2, 3>, typetorch::DType::F32,
                                  typetorch::Device::CPU, typetorch::Layout::Contiguous>;
 ```
 
-## What Compiles (and Why)
+## What Compiles
 
-### Broadcasting — shapes checked at compile time
+These are the key compile-time guarantees Typetorch provides. See
+[docs/examples.md](docs/examples.md) for the full catalog.
+
+### Broadcasting
 
 ```cpp
 using Matrix23 = Tensor<Shape<2, 3>, DType::F32, Device::CPU, Layout::Contiguous>;
 using Vector3  = Tensor<Shape<3>,    DType::F32, Device::CPU, Layout::Contiguous>;
 
-auto x = Matrix23::ones();
-auto b = Vector3::ones();
-
-auto y = x.add(b);   // OK: Shape<3> broadcasts with Shape<2,3> -> result is Shape<2,3>
+auto y = Matrix23::ones().add(Vector3::ones());
+// OK: Shape<3> broadcasts with Shape<2,3> -> result is Shape<2,3>
 ```
 
-```cpp
-// OK: scalar add just changes values, shape preserved
-auto y = x.add(torch::Scalar{2.0F});   // result: same Matrix23 type
-```
-
-### matmul — inner dimensions verified, batch broadcast computed
+### matmul
 
 ```cpp
 using In  = Tensor<Shape<dyn, 3>, DType::F32, Device::CPU, Layout::Any>;
 using Wt  = Tensor<Shape<3, 2>,   DType::F32, Device::CPU, Layout::Any>;
-using Out = Tensor<Shape<dyn, 2>, DType::F32, Device::CPU, Layout::Any>;
 
-auto x = In::retain(raw_input);
-auto w = Wt::retain(raw_weight);
-auto y = x.matmul(w);   // OK: inner dims (3,3) match -> result Shape<dyn, 2>
+auto y = In::retain(raw_input).matmul(Wt::retain(raw_weight));
+// OK: inner dims (3,3) match -> result Shape<dyn, 2>
 ```
 
-### transpose/permute — shape and layout computed statically
+### transpose/permute tracks layout
 
 ```cpp
-using Cube   = Tensor<Shape<2, 3, 4>, DType::F32, Device::CPU, Layout::Contiguous>;
+using Cube = Tensor<Shape<2, 3, 4>, DType::F32, Device::CPU, Layout::Contiguous>;
 
-auto x = Cube::ones();
+auto t  = std::move(Cube::ones()).transpose<0, 1>();
+// OK: Shape<3,2,4>, Layout::Any (transpose breaks contiguity)
 
-auto t = std::move(x).transpose<0, 1>();
-// OK: result Shape<3, 2, 4>, Layout::Any (transpose breaks contiguity)
-
-auto p = std::move(x).permute<0, 2, 1>();
-// OK: result Shape<2, 4, 3>, Layout::Any
-
-auto id = std::move(x).permute<0, 1, 2>();
-// OK: identity permute -> result Shape<2, 3, 4>, Layout::Contiguous (preserved!)
-
-auto c = std::move(p).contiguous();
-// OK: copy into contiguous layout -> result Shape<2, 4, 3>, Layout::Contiguous
+auto id = std::move(Cube::ones()).permute<0, 1, 2>();
+// OK: identity permute — Layout::Contiguous preserved
 ```
 
-### view/reshape — element count verified, -1 inference
+### view checks element count at compile time
 
 ```cpp
-using Matrix = Tensor<Shape<2, 3>, DType::F32, Device::CPU, Layout::Contiguous>;
-using Flat   = Tensor<Shape<6>,    DType::F32, Device::CPU, Layout::Contiguous>;
+auto v = std::move(Matrix23::ones()).view<6>();
+// OK: 2 x 3 = 6 elements -> Shape<6>
 
-auto x = Matrix::ones();
-
-auto v = std::move(x).view<6>();
-// OK: 2 x 3 = 6 elements -> Shape<6>, Layout::Contiguous
-
-auto v2 = std::move(x).view<typetorch::infer>();
-// OK: -1 inference -> Shape<6>, inferred from total elements
-```
-
-### squeeze/unsqueeze/flatten — dimensions tracked
-
-```cpp
-using Squeezable = Tensor<Shape<1, 2, 1, 3>, DType::F32, Device::CPU, Layout::Contiguous>;
-using Squeezed   = Tensor<Shape<2, 3>,       DType::F32, Device::CPU, Layout::Contiguous>;
-
-auto x = Squeezable::ones();
-auto s = x.squeeze();              // OK: removes all dim=1 -> Shape<2, 3>
-auto s1 = x.squeeze<2>();          // OK: removes dim=1 at index 2 -> Shape<1, 2, 3>
-
-auto u = Squeezed::ones().unsqueeze<0>();  // OK: adds dim=1 at index 0 -> Shape<1, 2, 3>
-
-auto f = Squeezed::ones().flatten<>();     // OK: flattens all -> Shape<6>
-auto f2 = Squeezed::ones().flatten<1, 2>();// OK: flattens dims 1..2 -> Shape<2, 3> (no-op here)
-```
-
-### where — condition dtype enforced
-
-```cpp
-using BoolMat = Tensor<Shape<2, 3>, DType::Bool, Device::CPU, Layout::Contiguous>;
-auto cond = BoolMat::retain(mask);
-auto x    = Matrix23::ones();
-auto y    = Matrix23::zeros();
-
-auto out = Matrix23::where(cond, x, y);  // OK: all shapes broadcast-compatible -> Matrix23
-```
-
-### cat/stack — rank and shape merging
-
-```cpp
-auto a = Matrix23::ones();
-auto b = Matrix23::ones();
-
-auto c0 = Matrix23::cat<0>(a, b);
-// OK: cat along dim 0 -> Shape<4, 3>
-
-auto c1 = typetorch::cat<1>(a, b);
-// OK: free-function form -> Shape<2, 6>
-
-auto s0 = Matrix23::stack<0>(a, b);
-// OK: stack along new dim 0 -> Shape<2, 2, 3>
-```
-
-### NN ops — selected operations with static checks
-
-```cpp
-auto x = Matrix23::randn();
-
-auto r = x.relu();                  // OK: no shape change
-auto g = x.gelu();                  // OK: static_assert ensures floating dtype
-auto s = x.softmax(1);              // OK: static_assert ensures floating dtype
-
-auto ln = x.layer_norm<3>();        // OK: normalized_shape matches trailing dims -> Shape<2,3>
-auto rn = x.rms_norm<3>();          // OK: same check for RMS norm
-
-auto m = x.masked_fill(BoolMat::ones(), torch::Scalar{0.0F});  // OK: mask must be Bool dtype
-```
-
-### arange — fully static tensor creation
-
-```cpp
-auto v  = Matrix23::arange<6>();                // OK: 0..5 -> Shape<6>, DType::F32
-auto v2 = Matrix23::arange<0, 6>();             // OK: same
-auto v3 = Matrix23::arange<0, 6, 2, DType::I64>();
-// OK: step=2 -> 3 elements -> Shape<3>, DType::I64
-```
-
-### Dynamic dimensions with `dyn`
-
-```cpp
-// dyn = runtime-only dimensions; checks that CAN be static still are
-using DynMat = Tensor<Shape<dyn, dyn>, DType::F32, Device::CPU, Layout::Any>;
-
-auto x = DynMat::retain(some_runtime_sized_tensor);  // OK
-auto y = DynMat::ones();   // ERROR: ones() requires fully static shape
+auto v2 = std::move(Matrix23::ones()).view<typetorch::infer>();
+// OK: -1 inference -> Shape<6>
 ```
 
 ## What Does NOT Compile
 
-These are the errors Typetorch exists to catch.
+These are the errors Typetorch exists to catch. See
+[docs/examples.md](docs/examples.md) for more cases.
 
-### Shape mismatch — caught at compile time
+### Shape mismatch
 
 ```cpp
-using Matrix23 = Tensor<Shape<2, 3>, DType::F32, Device::CPU, Layout::Contiguous>;
-using Matrix32 = Tensor<Shape<3, 2>, DType::F32, Device::CPU, Layout::Contiguous>;
-
-auto x = Matrix23::ones();
-auto y = Matrix32::ones();
-
-auto z = x.add(y);
+auto z = Matrix23::ones().add(Matrix32::ones());
 // ERROR: static assertion failed: tensor shapes are not broadcast-compatible
-//   BROADCAST_COMPATIBLE(Shape<2,3>, Shape<3,2>) -> false
-//   dim 0: 2 vs 3, neither is 1 -> fail at consteval time
+//   Shape<2,3> vs Shape<3,2>: dim 0 is 2 vs 3, neither is 1
 ```
 
-### matmul inner dimension mismatch
+### matmul inner dimension
 
 ```cpp
-using A = Tensor<Shape<2, 3>, DType::F32, Device::CPU, Layout::Contiguous>;
-using B = Tensor<Shape<2, 4>, DType::F32, Device::CPU, Layout::Contiguous>;
-
-auto z = A::ones().matmul(B::ones());
-// ERROR: consteval throw: matrix matmul inner dim mismatch
-//   A's last dim (3) != B's second-to-last dim (2)
+auto z = Tensor<Shape<2,3>>::ones().matmul(Tensor<Shape<2,4>>::ones());
+// ERROR: consteval throw — A's last dim (3) != B's second-to-last dim (2)
 ```
 
 ### view with wrong element count
 
 ```cpp
-using Matrix23 = Tensor<Shape<2, 3>, DType::F32, Device::CPU, Layout::Contiguous>;
-
-auto z = std::move(Matrix23::ones()).view<3, 3>();
-// ERROR: consteval throw: the sizes of the elements of the two
-//   tensors must be the same! (2x3=6 != 3x3=9)
+std::move(Matrix23::ones()).view<3, 3>();
+// ERROR: consteval throw — 2x3=6 != 3x3=9
 ```
 
 ### Factory on dynamic shape
 
 ```cpp
-using DynVec = Tensor<Shape<dyn>, DType::F32, Device::CPU, Layout::Contiguous>;
-
-auto v = DynVec::zeros();
-// ERROR: static assertion failed: Tensor::zeros() requires a fully static shape
-//   DynVec::shape::dynamic_rank is non-zero
+Tensor<Shape<dyn>>::zeros();
+// ERROR: static assertion failed — requires a fully static shape
 ```
 
-### gelu / softmax on integer dtype
+### Integer dtype on float-only ops
 
 ```cpp
-using IntMat = Tensor<Shape<2, 3>, DType::I64, Device::CPU, Layout::Contiguous>;
-
-auto g = IntMat::ones().gelu();
-// ERROR: static assertion failed: Tensor::gelu() requires floating tensor dtype
-//   detail::is_floating_dtype(DType::I64) -> false
+Tensor<Shape<2,3>, DType::I64>::ones().gelu();
+// ERROR: static assertion — gelu() requires floating tensor dtype
 ```
 
-### view/reshape on non-contiguous tensor
+### View on non-contiguous tensor
 
 ```cpp
-using Cube = Tensor<Shape<2, 3, 4>, DType::F32, Device::CPU, Layout::Contiguous>;
-
-auto x = Cube::ones();
-auto t = std::move(x).transpose<0, 2>();   // layout degrades to Layout::Any
-auto v = std::move(t).view<2, 4, 3>();
-// ERROR: consteval throw: Tensor should be contiguous!
-//   Must call .contiguous() first
+auto t = std::move(cube).transpose<0, 2>();
+std::move(t).view<2, 4, 3>();
+// ERROR: consteval throw — Tensor should be contiguous!
+// Fix: call .contiguous() first
 ```
 
-Fix:
+### Conservative widening (not an error, but important)
 
 ```cpp
-auto v = std::move(t).contiguous().view<2, 4, 3>();  // OK
-```
-
-### masked_fill with non-bool mask
-
-```cpp
-auto x = Matrix23::ones();
-auto m = Matrix23::ones();  // F32 mask — not allowed
-
-auto z = x.masked_fill(m, torch::Scalar{0.0F});
-// ERROR: static assertion failed: Tensor::masked_fill() requires a bool mask tensor
-//   Mask::dtype is F32, not Bool
-```
-
-### DType conflict in arithmetic (conservative widening)
-
-```cpp
-using F32Mat = Tensor<Shape<2, 3>, DType::F32, Device::CPU, Layout::Contiguous>;
-using I64Mat = Tensor<Shape<2, 3>, DType::I64, Device::CPU, Layout::Contiguous>;
-
-auto z = F32Mat::ones().add(I64Mat::ones());
-// Compiles, BUT result dtype is DType::Any — the type system conservatively
-// widens to Any when dtypes differ. This propagates through subsequent ops.
-```
-
-### Device mismatch (conservative widening)
-
-```cpp
-using CPUMat  = Tensor<Shape<2, 3>, DType::F32, Device::CPU,  Layout::Contiguous>;
-using CUDAMat = Tensor<Shape<2, 3>, DType::F32, Device::CUDA, Layout::Contiguous>;
-
-auto z = CPUMat::ones().add(CUDAMat::ones());
-// Compiles, BUT result device is Device::Any — same conservative widening.
+auto z = F32Mat::ones().add(I64Mat::ones());   // result dtype -> DType::Any
+auto z = CPUMat::ones().add(CUDAMat::ones());  // result device -> Device::Any
+// Different dtypes or devices widen to Any rather than erroring.
+// This is intentional but worth knowing: Any propagates through subsequent ops.
 ```
 
 ### Runtime retain with wrong shape
 
 ```cpp
-auto raw = torch::arange(9, opts).view({3, 3});   // 3x3 at runtime
+auto raw = torch::arange(9, opts).view({3, 3});
 auto x = Matrix23::retain(raw);
-// RUNTIME ERROR: check_tensor_compatible_runtime fails
-//   Expected shape <2, 3>, got <3, 3>
+// RUNTIME ERROR: expected shape <2,3>, got <3,3>
 ```
 
 ## Trust Boundary: retain vs unsafe
@@ -503,8 +355,155 @@ Key comparisons:
 The arithmetic test (~124K) is about 2x the baseline probes because it exercises
 all op categories (arithmetic, view, NN, aggregate).
 
+
+## Using Typetorch in Your Project
+
+Typetorch is currently distributed as a source dependency with a local xmake
+package recipe. It is not yet published in the official xmake package
+repository, so your project must clone or vendor this repository first.
+
+### Requirements
+
+- Linux x86-64
+- GCC 16.1 or newer with C++26 modules and reflection support
+- xmake
+- Git
+
+The current package recipe uses LibTorch 2.8.0 with CUDA 12.8. A GPU is not
+required for CPU-only programs, but CUDA execution requires a compatible
+NVIDIA driver.
+
+### 1. Add Typetorch to your project
+
+Using a Git submodule is recommended:
+
+```bash
+git submodule add https://github.com/OHNope/Typetorch.git third_party/typetorch
+git submodule update --init --recursive
+```
+
+The resulting layout should be:
+
+```text
+your-project/
+├── xmake.lua
+├── src/
+│   └── main.cpp
+└── third_party/
+    └── typetorch/
+```
+
+When cloning a project that already contains the submodule, use:
+
+```bash
+git clone --recurse-submodules <your-project-url>
+```
+
+### 2. Configure xmake
+
+Add the local repository and Typetorch module rule to your project's
+`xmake.lua`:
+
+```lua
+set_project("my-project")
+set_languages("c++26")
+set_policy("build.c++.modules.gcc.cxx11abi", true)
+
+add_repositories("typetorch-repo third_party/typetorch")
+includes("third_party/typetorch/xmake_package.lua")
+add_requires("typetorch")
+
+target("my_app")
+    set_kind("binary")
+    add_packages("typetorch")
+    add_rules("typetorch.modules")
+    add_files("src/main.cpp")
+```
+
+`add_packages("typetorch")` propagates the LibTorch include paths, libraries,
+runtime paths, and required compiler options. `typetorch.modules` adds the
+installed Typetorch module sources in dependency order. Do not list the module
+files manually.
+
+### 3. Import Typetorch
+
+```cpp
+// src/main.cpp
+import std;
+import typetorch;
+
+using Matrix = typetorch::Tensor<typetorch::Shape<64, 128>,
+                                 typetorch::DType::F32,
+                                 typetorch::Device::CPU,
+                                 typetorch::Layout::Contiguous>;
+
+int main() {
+    auto x = Matrix::randn();
+    auto w = Matrix::randn();
+    auto y = x.add(w);
+    return std::move(y).unwrap().numel() == 64 * 128 ? 0 : 1;
+}
+```
+
+Do not mix `import typetorch;` with textual inclusion of Typetorch or LibTorch
+headers in the same translation unit. That can cause duplicate declarations.
+
+### 4. Build and run
+
+```bash
+xmake f -m release --yes
+xmake build my_app
+xmake run my_app
+```
+
+The first configuration downloads and installs the pinned LibTorch package.
+It is large. Later configurations reuse xmake's package cache unless the cache
+is deleted or installation is explicitly forced.
+
+If GCC is installed in a nonstandard or relocated location, configure the
+compiler before running xmake:
+
+```bash
+export GCC_ROOT=/path/to/gcc-16.1.0
+project_root="$PWD"
+source third_party/typetorch/scripts/env.sh
+cd "$project_root"
+
+xmake f -m release --yes
+xmake build my_app
+xmake run my_app
+```
+
+`scripts/env.sh` changes into the Typetorch repository, which is why the
+example saves and restores the consumer project's directory.
+
+### Common issues
+
+**"fatal error: module 'typetorch:types' not found"**
+
+Use both `add_packages("typetorch")` and `add_rules("typetorch.modules")` on
+the consuming target. Do not add the `.mpp` files manually.
+
+**xmake downloads LibTorch again**
+
+A normal `xmake f` reuses the package cache. Commands such as
+`xmake require --force`, or deleting xmake's package cache, force LibTorch to
+be downloaded and installed again.
+
+**"crti.o: cannot open" or "crtbeginS.o: no such file"**
+
+Your GCC is a relocated toolchain. Source typetorch's `scripts/env.sh` before
+building, or set `TYPETORCH_GCC_RELOCATE_LDFLAGS` in your environment.
+
+**"undefined reference to torch::..."**
+
+Ensure the consuming target has `add_packages("typetorch")`. This propagates
+the LibTorch link libraries.
+
+
 ## Documentation
 
+- [Compile-Time Examples](docs/examples.md) — exhaustive what-compiles / what-does-not examples
 - [API Notes](docs/api.md) — contract details, operation style, differences from LibTorch
 - [Design Notes](docs/design.md) — architecture decisions
 - [Performance and Size Notes](docs/performance-and-size.md) — benchmarks and binary analysis

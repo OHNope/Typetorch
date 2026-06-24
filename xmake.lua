@@ -320,11 +320,10 @@ target("typetorch_tensor_arithmetic_test")
     })
 target_end()
 
-target("core")
+target("typetorch_sdk")
     configure_libtorch_target({
         kind = "static",
-        torch_python = true,
-        files = {"src/test.cpp"},
+        default = false,
     })
 target_end()
 

@@ -1,0 +1,14 @@
+set_project("typetorch-package-test")
+set_version("0.1.0")
+set_languages("c++26")
+set_policy("build.c++.modules.gcc.cxx11abi", true)
+
+add_repositories("typetorch-repo " .. path.join(os.projectdir(), "..", ".."))
+includes("../../xmake_package.lua")
+add_requires("typetorch")
+
+target("package_consumer")
+    set_kind("binary")
+    add_packages("typetorch")
+    add_rules("typetorch.modules")
+    add_files("main.cpp")
