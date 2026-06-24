@@ -10,10 +10,7 @@ unsafe_target="binary_size_tensor_unsafe_probe"
 
 targets=("$native_target" "$checked_target" "$unsafe_target")
 
-xmake f -m "$mode" --yes --python="$PYTHON"
-for target in "${targets[@]}"; do
-  xmake build "$target"
-done
+xmake build -j "${BUILD_JOBS:-2}" "${targets[@]}"
 
 bin_path() {
   printf 'build/linux/x86_64/%s/%s' "$mode" "$1"
