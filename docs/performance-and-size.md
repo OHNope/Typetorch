@@ -96,21 +96,6 @@ All ratios are within 2.3% of 1.0. Five of six operations show typetorch
 slightly faster than raw LibTorch, which is measurement noise and/or
 optimizer differences — the wrapper itself adds no measurable cost.
 
-### Previous snapshot (2026-06, before attribute/extensions, 1000 iterations)
-
-| Operation | Raw ns/op | Typetorch ns/op | Ratio | Overhead |
-| --- | ---: | ---: | ---: | ---: |
-| `add.dynamic` | 1984.77 | 1977.40 | 0.9963 | -0.37% |
-| `add.static` | 2008.37 | 1990.74 | 0.9912 | -0.88% |
-| `matmul.static` | 12711.79 | 12760.02 | 1.0038 | +0.38% |
-| `transpose.static` | 994.18 | 998.07 | 1.0039 | +0.39% |
-| `view.static` | 748.61 | 745.29 | 0.9956 | -0.44% |
-| `permute.static` | 1125.07 | 1112.86 | 0.9891 | -1.09% |
-
-Results are consistent: forwarding overhead remains at zero regardless of
-attribute optimization. The current snapshot uses 10x more iterations for
-lower noise.
-
 ### Debug mode snapshot (2026-06-24, 10000 iterations)
 
 | Operation | Raw ns/op | Typetorch ns/op | Ratio |
@@ -149,20 +134,6 @@ size \
 | `binary_size_tensor_unsafe_probe` | 22236 | 1696 | 200 | 24132 | 5e44 |
 | `typetorch_tensor_arithmetic_test` | 84238 | 2432 | 200 | 86870 | 15356 |
 
-### Comparison: before vs after attribute/extensions
-
-| Target | text before | text after | reduction |
-| --- | ---: | ---: | ---: |
-| `typetorch_forwarding_benchmark` | 73363 | 49430 | **-32.6%** |
-| `binary_size_libtorch_probe` | 61968 | 22356 | **-63.9%** |
-| `binary_size_tensor_checked_probe` | 66156 | 30117 | **-54.5%** |
-| `binary_size_tensor_unsafe_probe` | 62488 | 22236 | **-64.4%** |
-| `typetorch_tensor_arithmetic_test` | 124074 | 84238 | **-32.1%** |
-
-The dramatic reduction comes from `-ffunction-sections -fdata-sections -Wl,--gc-sections`
-combined with `TYPETORCH_COLD` on error-reporting functions, which allows the
-linker to discard cold paths that are never called in a given binary.
-
 ### Key comparisons
 
 | Comparison | text diff | Meaning |
@@ -186,7 +157,7 @@ effectively from the typed binary.
 The older `binary_size_tensor_probe` mixed checked and unsafe retain paths, so
 it should not be used as the headline Typetorch-vs-LibTorch comparison.
 
-## Symbol Growth Probe
+## Symbol Growth Probe (2026-06-24)
 
 Release binaries are stripped by the current build, so use the debug probes for
 symbol accounting:
@@ -195,21 +166,61 @@ symbol accounting:
 bash scripts/nm_size_probe.sh debug
 ```
 
-The script reports three executables: native LibTorch, fully checked Typetorch,
-and fully unsafe Typetorch. All probes print `16` and execute the same
-high-level retain/add/unwrap/numel flow. The checked and unsafe probes differ
-only at the raw-to-typed boundary.
+The script reports three executables: native LibTorch (`binary_size_libtorch_probe`),
+fully checked Typetorch (`binary_size_tensor_checked_probe`), and fully unsafe
+Typetorch (`binary_size_tensor_unsafe_probe`). All probes print `16` and execute
+the same high-level retain/add/unwrap/numel flow. The checked and unsafe probes
+differ only at the raw-to-typed boundary.
 
-Key summary rows:
+### Debug Binary Sizes
 
-| Row | Meaning |
-| --- | --- |
-| `native_probe_functions` | Native `torch::Tensor` helper functions. |
-| `checked_probe_functions` | Typetorch helper functions in the fully checked probe. |
-| `unsafe_probe_functions` | Typetorch helper functions in the fully unsafe probe. |
-| `checked_runtime_checks` | Runtime contract check symbols pulled in by `retain()`. |
-| `unsafe_runtime_checks` | Should be zero or much smaller; any non-zero value indicates checks were pulled in indirectly. |
-| `*_tensor_wrapper_unique` | Wrapper code folded by address; this is the better code-entity count than raw nm records. |
+| Binary | text | data | bss | dec | hex |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| native (raw LibTorch) | 119854 | 1576 | 200 | 121630 | 1db1e |
+| unsafe (Typetorch, no checks) | 120433 | 1576 | 200 | 122209 | 1dd61 |
+| checked (Typetorch, full checks) | 137473 | 1624 | 200 | 139297 | 22021 |
+
+### Symbol-Level Accounting
+
+| Metric | bytes | symbols | Meaning |
+| --- | ---: | ---: | --- |
+| `native_probe_functions` | 486 | 9 | Raw `torch::Tensor` helper functions in the native probe |
+| `checked_probe_functions` | 628 | 8 | Typetorch-owned helpers in the fully checked probe |
+| `checked_tensor_wrapper` | 594 | 11 | Tensor wrapper code (total nm records) in checked probe |
+| `checked_tensor_wrapper_unique` | 410 | 6 | Tensor wrapper code (unique by address) in checked probe |
+| `checked_runtime_checks` | 938 | 5 | Runtime contract check symbols pulled in by `retain()` |
+| `unsafe_probe_functions` | 727 | 8 | Typetorch-owned helpers in the unsafe probe |
+| `unsafe_tensor_wrapper` | 368 | 10 | Tensor wrapper code (total nm records) in unsafe probe |
+| `unsafe_tensor_wrapper_unique` | 184 | 5 | Tensor wrapper code (unique by address) in unsafe probe |
+| `unsafe_runtime_checks` | **0** | **0** | Zero runtime checks in the unsafe path |
+
+### Key Takeaways
+
+| Comparison | text delta | Meaning |
+| --- | ---: | --- |
+| unsafe vs native | +579 bytes (+0.48%) | Typetorch forwarding alone — nearly invisible in debug, zero in release |
+| checked vs native | +17619 bytes (+14.7%) | Typetorch wrapper + runtime boundary validation |
+| checked vs unsafe | +17040 bytes (+14.1%) | Isolated cost of runtime checks (debug mode) |
+| checked_tensor_wrapper_unique vs unsafe | +226 bytes | Extra wrapper code variants from the checked path |
+| unsafe_runtime_checks | **0 bytes, 0 symbols** | Unsafe path pulls zero runtime check code |
+
+The unsafe path in debug adds only 579 bytes of text over native LibTorch
+(+0.48%). This confirms that Typetorch wrapper types, factories, and forwarding
+functions contribute negligible code to the binary when runtime checks are
+bypassed. In release builds the difference disappears entirely (unsafe is
+actually 120 bytes *smaller* than native, see the Binary Size Results section).
+
+The checked path adds ~17 KB of text in debug, most of which comes from the
+runtime contract check functions (`check_tensor_compatible_runtime` and its
+callees). This is the expected cost of validating shape, dtype, device, and
+layout at the raw-to-typed boundary.
+
+`checked_tensor_wrapper_unique` (410 bytes, 6 unique address-visible symbols)
+vs `unsafe_tensor_wrapper_unique` (184 bytes, 5 unique address-visible symbols)
+shows that `retain()` pulls in additional wrapper code variants (e.g. the
+`Layout::Any` variants used by the checked path) beyond what the pure unsafe
+path needs.
+
 
 ## Reproducibility Notes
 

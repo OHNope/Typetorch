@@ -1,0 +1,175 @@
+export module typetorch:nnModules_sequential;
+
+import std;
+import libtorch;
+import :types;
+
+export namespace typetorch
+{
+
+namespace detail
+{
+
+template <class ModuleKind>
+concept TypedModuleHolder =
+	requires(ModuleKind const &module)
+	{
+		typename ModuleKind::Impl;
+		module.ptr();
+	} &&
+	::std::derived_from<typename ModuleKind::Impl, ::torch::nn::Module>;
+
+template <TypedModuleHolder... Modules>
+	requires(sizeof...(Modules) > 0)
+struct TypedSequentialImpl : ::torch::nn::Module
+{
+	explicit TypedSequentialImpl(Modules... modules)
+		: modules_{::std::move(modules)...}
+	{
+		register_modules(::std::index_sequence_for<Modules...>{});
+	}
+
+	template <TensorLike Input>
+	[[nodiscard]] inline auto forward(Input const &input)
+	{
+		return forward_at<0>(input);
+	}
+
+	template <::std::size_t Index>
+	[[nodiscard]] inline auto get() noexcept -> auto &
+	{
+		static_assert(Index < sizeof...(Modules),
+					  "Sequential module index out of range");
+		return ::std::get<Index>(modules_);
+	}
+
+	template <::std::size_t Index>
+	[[nodiscard]] inline auto get() const noexcept -> auto const &
+	{
+		static_assert(Index < sizeof...(Modules),
+					  "Sequential module index out of range");
+		return ::std::get<Index>(modules_);
+	}
+
+	template <TypedModuleHolder NewModule>
+	[[nodiscard]] inline auto push_back(NewModule module) const
+	{
+		return push_back_impl(::std::move(module),
+							  ::std::index_sequence_for<Modules...>{});
+	}
+
+	template <Device ndevice, DType ndtype>
+	[[nodiscard]] inline auto to() const
+	{
+		return to_impl<ndevice, ndtype>(
+			::std::index_sequence_for<Modules...>{});
+	}
+
+	static constexpr ::std::size_t size{sizeof...(Modules)};
+
+private:
+	template <::std::size_t Index, TensorLike Input>
+	[[nodiscard]] inline auto forward_at(Input const &input)
+	{
+		auto output{::std::get<Index>(modules_)->forward(input)};
+		static_assert(TensorLike<decltype(output)>,
+					  "Sequential modules must return a single typed Tensor");
+
+		if constexpr (Index + 1 == sizeof...(Modules))
+		{
+			return output;
+		}
+		else
+		{
+			return forward_at<Index + 1>(output);
+		}
+	}
+
+	template <::std::size_t... Indices>
+	inline void register_modules(::std::index_sequence<Indices...>)
+	{
+		(this->register_module(::std::to_string(Indices),
+							   ::std::get<Indices>(modules_)),
+		 ...);
+	}
+
+	template <TypedModuleHolder NewModule, ::std::size_t... Indices>
+	[[nodiscard]] inline auto
+	push_back_impl(NewModule module,
+				   ::std::index_sequence<Indices...>) const
+	{
+		using ResultImpl =
+			TypedSequentialImpl<Modules..., ::std::remove_cvref_t<NewModule>>;
+		return ::std::make_shared<ResultImpl>(
+			::std::get<Indices>(modules_)..., ::std::move(module));
+	}
+
+	template <Device ndevice, DType ndtype, ::std::size_t... Indices>
+	[[nodiscard]] inline auto
+	to_impl(::std::index_sequence<Indices...>) const
+	{
+		using ResultImpl = TypedSequentialImpl<
+			decltype(::std::get<Indices>(modules_)
+						 .template to<ndevice, ndtype>())...>;
+		return ::std::make_shared<ResultImpl>(
+			::std::get<Indices>(modules_).template to<ndevice, ndtype>()...);
+	}
+
+	::std::tuple<Modules...> modules_;
+};
+
+} // namespace detail
+
+template <detail::TypedModuleHolder... Modules>
+	requires(sizeof...(Modules) > 0)
+class Sequential
+	: public ::torch::nn::ModuleHolder<
+		  detail::TypedSequentialImpl<Modules...>>
+{
+public:
+	using Impl = detail::TypedSequentialImpl<Modules...>;
+	using Base = ::torch::nn::ModuleHolder<Impl>;
+	using Base::Base;
+
+	explicit Sequential(Modules... modules)
+		: Base(::std::move(modules)...)
+	{
+	}
+
+	template <::std::size_t Index>
+	[[nodiscard]] inline auto get() noexcept -> auto &
+	{
+		return this->ptr()->template get<Index>();
+	}
+
+	template <::std::size_t Index>
+	[[nodiscard]] inline auto get() const noexcept -> auto const &
+	{
+		return this->ptr()->template get<Index>();
+	}
+
+	template <detail::TypedModuleHolder NewModule>
+	[[nodiscard]] inline auto push_back(NewModule module) const
+	{
+		using Result =
+			Sequential<Modules..., ::std::remove_cvref_t<NewModule>>;
+		return Result{this->ptr()->push_back(::std::move(module))};
+	}
+
+	template <Device ndevice, DType ndtype>
+	[[nodiscard]] inline auto to() const
+	{
+		using Result = Sequential<
+			decltype(::std::declval<Modules const &>()
+						 .template to<ndevice, ndtype>())...>;
+		return Result{this->ptr()->template to<ndevice, ndtype>()};
+	}
+
+	static constexpr ::std::size_t size{sizeof...(Modules)};
+};
+
+template <class... Modules>
+	requires(sizeof...(Modules) > 0)
+Sequential(Modules...) -> Sequential<::std::remove_cvref_t<Modules>...>;
+
+} // namespace typetorch

@@ -59,15 +59,10 @@ struct TypedConv2dImpl : ::torch::nn::Conv2dImpl
 				  "Conv2d parameters require a floating dtype");
 
 	explicit TypedConv2dImpl(bool with_bias = true,
-							::torch::nn::Conv2dOptions::padding_mode_t padding_mode =
-								::torch::kZeros)
+							 ::torch::nn::Conv2dOptions::padding_mode_t padding_mode =
+								 ::torch::kZeros)
 		: ::torch::nn::Conv2dImpl(make_options(with_bias, padding_mode))
 	{
-		weight.set_data(weight.to(parameter_options()));
-		if (bias.defined())
-		{
-			bias.set_data(bias.to(parameter_options()));
-		}
 	}
 
 	template <TensorLike Input>
@@ -83,8 +78,8 @@ struct TypedConv2dImpl : ::torch::nn::Conv2dImpl
 
 		using InputShape = typename Input::shape;
 		using ResultShape = typename[:conv2d_shape_meta(
-			InputShape::dims, InChannels, OutChannels, KernelSize::dims,
-			Stride::dims, Padding::dims, Dilation::dims):];
+										  InputShape::dims, InChannels, OutChannels, KernelSize::dims,
+										  Stride::dims, Padding::dims, Dilation::dims):];
 		using Result = Tensor<ResultShape, dtype, device, Layout::Any>;
 
 		return Result::unsafe_move(
@@ -97,7 +92,7 @@ struct TypedConv2dImpl : ::torch::nn::Conv2dImpl
 		auto result{::std::make_shared<TypedConv2dImpl<
 			InChannels, OutChannels, KernelSize, Stride, Padding, Dilation,
 			Groups, ndtype, ndevice>>(this->options.bias(),
-									 this->options.padding_mode())};
+									  this->options.padding_mode())};
 		result->weight.set_data(weight.to(container_options<ndtype, ndevice>()));
 		if (bias.defined())
 		{
@@ -147,13 +142,13 @@ private:
 		::torch::nn::Conv2dOptions options{
 			InChannels, OutChannels,
 			::std::array<::std::int64_t, 2>{KernelSize::dims[0],
-										   KernelSize::dims[1]}};
+											KernelSize::dims[1]}};
 		options.stride(::std::array<::std::int64_t, 2>{Stride::dims[0],
-													  Stride::dims[1]});
+													   Stride::dims[1]});
 		options.padding(::std::array<::std::int64_t, 2>{Padding::dims[0],
-													   Padding::dims[1]});
+														Padding::dims[1]});
 		options.dilation(::std::array<::std::int64_t, 2>{Dilation::dims[0],
-														Dilation::dims[1]});
+														 Dilation::dims[1]});
 		options.groups(Groups);
 		options.bias(with_bias);
 		options.padding_mode(::std::move(padding_mode));

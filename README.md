@@ -351,7 +351,6 @@ All ratios are within 2.3% of 1.0 — **zero-cost abstraction confirmed.**
 
 ### Binary Size (release, 2026-06-24, with attribute/extensions)
 
-Compiler attributes and `--gc-sections` reduce binary sizes by 32–64%
 compared to the previous snapshot.
 
 | Target | text | data | bss | dec | hex |
@@ -369,22 +368,6 @@ Key comparisons:
 
 Arithmetic test (84238 text) exercises all op categories: arithmetic, view, NN, aggregate.
 All arithmetic tests pass in both debug and release builds.
-
-### Size Reduction vs Previous Snapshot
-
-| Target | text before | text after | reduction |
-| --- | ---: | ---: | ---: |
-| `typetorch_forwarding_benchmark` | 73363 | 49430 | **-32.6%** |
-| `binary_size_libtorch_probe` | 61968 | 22356 | **-63.9%** |
-| `binary_size_tensor_checked_probe` | 66156 | 30117 | **-54.5%** |
-| `binary_size_tensor_unsafe_probe` | 62488 | 22236 | **-64.4%** |
-| `typetorch_tensor_arithmetic_test` | 124074 | 84238 | **-32.1%** |
-
-The reduction is driven by `-ffunction-sections -fdata-sections -Wl,--gc-sections`
-combined with `TYPETORCH_COLD` on error-reporting paths — the linker can discard
-cold functions that are never called in a given binary.
-
-
 
 ## Using Typetorch in Your Project
 

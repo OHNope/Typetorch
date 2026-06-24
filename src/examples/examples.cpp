@@ -52,6 +52,22 @@ using DynamicImageBatchConv =
 using TestConv2d =
 	typetorch::Conv2d<3, 8, typetorch::Shape<3, 5>,
 					  typetorch::Shape<2, 1>, typetorch::Shape<1, 2>>;
+using SequentialInput =
+	typetorch::Tensor<typetorch::Shape<5, 3>, typetorch::DType::F32,
+					typetorch::Device::CPU, typetorch::Layout::Any>;
+using SequentialHidden =
+	typetorch::Tensor<typetorch::Shape<5, 4>, typetorch::DType::F32,
+					typetorch::Device::CPU, typetorch::Layout::Any>;
+using SequentialOutput =
+	typetorch::Tensor<typetorch::Shape<5, 2>, typetorch::DType::F32,
+					typetorch::Device::CPU, typetorch::Layout::Any>;
+using TestSequential =
+	typetorch::Sequential<typetorch::Linear<3, 4>,
+						  typetorch::Linear<4, 2>>;
+using TestSequentialExtended =
+	typetorch::Sequential<typetorch::Linear<3, 4>,
+						  typetorch::Linear<4, 2>,
+						  typetorch::Linear<2, 1>>;
 
 static_assert(::std::is_same_v<decltype(Vector::retain(
 								   ::std::declval<::torch::Tensor const &>())),
@@ -129,6 +145,27 @@ static_assert(::std::is_same_v<
 							  typetorch::DType::F32,
 							  typetorch::Device::CPU>>);
 static_assert(::std::is_default_constructible_v<TestConv2d>);
+static_assert(TestSequential::size == 2);
+static_assert(::std::is_same_v<
+			  decltype(::std::declval<TestSequential::Impl &>().forward(
+				  ::std::declval<SequentialInput const &>())),
+			  SequentialOutput>);
+static_assert(::std::is_same_v<
+			  decltype(::std::declval<TestSequential &>().template get<0>()),
+			  typetorch::Linear<3, 4> &>);
+static_assert(::std::is_same_v<
+			  decltype(::std::declval<TestSequential const &>()
+						   .push_back(typetorch::Linear<2, 1>{})),
+			  TestSequentialExtended>);
+static_assert(::std::is_same_v<
+			  decltype(::std::declval<TestSequential const &>()
+						   .template to<typetorch::Device::CPU,
+										typetorch::DType::F16>()),
+			  typetorch::Sequential<
+				  typetorch::Linear<3, 4, typetorch::DType::F16,
+									typetorch::Device::CPU>,
+				  typetorch::Linear<4, 2, typetorch::DType::F16,
+									typetorch::Device::CPU>>>);
 
 ::torch::Tensor fixed_linear_weight();
 
@@ -140,6 +177,17 @@ TestConv2d make_test_conv2d()
 auto convert_test_conv2d(TestConv2d const &conv)
 {
 	return conv.to<typetorch::Device::CPU, typetorch::DType::F16>();
+}
+
+auto make_test_sequential()
+{
+	return typetorch::Sequential{typetorch::Linear<3, 4>{},
+								 typetorch::Linear<4, 2>{}};
+}
+
+auto extend_test_sequential(TestSequential const &sequential)
+{
+	return sequential.push_back(typetorch::Linear<2, 1>{});
 }
 
 } // namespace detail
