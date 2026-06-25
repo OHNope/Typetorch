@@ -1,0 +1,62 @@
+export module typetorch:nnModules_activation;
+
+import std;
+import libtorch;
+import :types;
+import :tensor;
+
+#include "attributes.inc"
+
+export namespace typetorch
+{
+
+namespace detail
+{
+
+struct TypedReLUImpl : ::torch::nn::Module
+{
+	[[nodiscard]] TYPETORCH_HOT inline auto
+	forward(::torch::Tensor const &input)
+	{
+		return ::torch::relu(input);
+	}
+
+	template <TensorLike Input>
+	[[nodiscard]] TYPETORCH_HOT inline auto forward(Input const &input)
+	{
+		using Result =
+			Tensor<typename Input::shape, Input::dtype, Input::device,
+				   Input::layout>;
+		return Result::unsafe_move(::torch::relu(input.unsafe_raw()));
+	}
+
+	template <Device, DType>
+	[[nodiscard]] inline auto to() const
+	{
+		return ::std::make_shared<TypedReLUImpl>();
+	}
+};
+
+} // namespace detail
+
+class ReLU : public ::torch::nn::ModuleHolder<detail::TypedReLUImpl>
+{
+public:
+	using Impl = detail::TypedReLUImpl;
+	using Base = ::torch::nn::ModuleHolder<Impl>;
+	using Base::Base;
+
+	template <Device ndevice, DType ndtype>
+	[[nodiscard]] inline auto to() const
+	{
+		return ReLU{this->ptr()->template to<ndevice, ndtype>()};
+	}
+
+	template <DType>
+	[[nodiscard]] inline auto to() const
+	{
+		return ReLU{};
+	}
+};
+
+} // namespace typetorch

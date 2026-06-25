@@ -1,0 +1,233 @@
+export module typetorch:nnModules_mlp;
+
+import std;
+import libtorch;
+import :types;
+import :common;
+import :tensor;
+import :nnModules_core;
+import :nnModules_linear;
+
+export namespace typetorch
+{
+
+namespace detail
+{
+
+template <ShapeLike Widths, DType dtype, Device device, ::std::size_t... I>
+auto mlp_layers_type(::std::index_sequence<I...>)
+	-> ::std::tuple<
+		Linear<Widths::dims[I], Widths::dims[I + 1], dtype, device>...>;
+
+template <ShapeLike Widths, DType dtype, Device device>
+using MLPLayers = decltype(mlp_layers_type<Widths, dtype, device>(
+	::std::make_index_sequence<
+		Widths::rank >= 2 ? Widths::rank - 1 : 0>{}));
+
+template <ShapeLike Widths, DType dtype = DType::F32,
+		  Device device = Device::CPU>
+struct TypedMLPImpl : ::torch::nn::Module
+{
+	static_assert(Widths::rank >= 2,
+				  "TypedMLP widths must contain input and output features");
+	static_assert(dtype != DType::Any,
+				  "TypedMLP parameters require a concrete dtype");
+	static_assert(device != Device::Any,
+				  "TypedMLP parameters require a concrete device");
+	static_assert(::typetorch::detail::is_floating_dtype(dtype),
+				  "TypedMLP parameters require a floating dtype");
+	static_assert([] consteval {
+		for (::std::int64_t const width : Widths::dims)
+		{
+			if (width <= 0)
+			{
+				return false;
+			}
+		}
+		return true;
+	}(), "TypedMLP feature widths must be positive");
+
+	static constexpr ::std::size_t layer_count{Widths::rank - 1};
+	using Layers = MLPLayers<Widths, dtype, device>;
+	using Biases = ::std::array<bool, layer_count>;
+
+	TypedMLPImpl()
+		: TypedMLPImpl(true)
+	{
+	}
+
+	explicit TypedMLPImpl(bool with_bias)
+		: TypedMLPImpl(make_biases(with_bias))
+	{
+	}
+
+	explicit TypedMLPImpl(Biases const &biases)
+		: TypedMLPImpl(make_layers(biases))
+	{
+	}
+
+	explicit TypedMLPImpl(Layers layers)
+		: layers_{::std::move(layers)}
+	{
+		register_layers();
+	}
+
+	template <TensorLike Input>
+	[[nodiscard]] inline auto forward(Input const &input)
+	{
+		using InputShape = typename Input::shape;
+		using ResultShape = typename[:linear_shape_meta(
+			InputShape::dims, Widths::dims[0],
+			Widths::dims[Widths::rank - 1]):];
+		using Result =
+			Tensor<ResultShape, common_dtype(Input::dtype, dtype),
+				   common_device(Input::device, device), Layout::Any>;
+
+		::torch::Tensor output{input.unsafe_raw()};
+		template for (constexpr ::std::size_t I :
+					  ::std::views::iota(::std::size_t{}, layer_count - 1))
+		{
+			output = ::std::get<I>(layers_)->forward(output).relu();
+		}
+		return Result::unsafe_move(
+			::std::get<layer_count - 1>(layers_)->forward(output));
+	}
+
+	template <::std::size_t Index>
+	[[nodiscard]] inline auto get() noexcept -> auto &
+	{
+		static_assert(Index < layer_count, "TypedMLP layer index out of range");
+		return ::std::get<Index>(layers_);
+	}
+
+	template <::std::size_t Index>
+	[[nodiscard]] inline auto get() const noexcept -> auto const &
+	{
+		static_assert(Index < layer_count, "TypedMLP layer index out of range");
+		return ::std::get<Index>(layers_);
+	}
+
+	template <Device ndevice, DType ndtype = dtype>
+	[[nodiscard]] inline auto to() const
+	{
+		using ResultImpl = TypedMLPImpl<Widths, ndtype, ndevice>;
+		using ResultLayers = typename ResultImpl::Layers;
+		auto layers{::std::apply(
+			[](auto const &...layer) {
+				return ResultLayers{
+					layer.template to<ndevice, ndtype>()...};
+			},
+			layers_)};
+		return ::std::make_shared<ResultImpl>(::std::move(layers));
+	}
+
+	template <DType ndtype>
+	[[nodiscard]] inline auto to() const
+	{
+		return to<device, ndtype>();
+	}
+
+	static constexpr ::std::int64_t input_features{Widths::dims[0]};
+	static constexpr ::std::int64_t output_features{
+		Widths::dims[Widths::rank - 1]};
+	static constexpr DType dtype_kind{dtype};
+	static constexpr Device device_kind{device};
+
+private:
+	static constexpr auto make_biases(bool value) -> Biases
+	{
+		Biases result{};
+		result.fill(value);
+		return result;
+	}
+
+	template <::std::size_t... I>
+	static auto make_layers_impl(Biases const &biases,
+								 ::std::index_sequence<I...>) -> Layers
+	{
+		return Layers{
+			Linear<Widths::dims[I], Widths::dims[I + 1], dtype, device>{
+				biases[I]}...};
+	}
+
+	static auto make_layers(Biases const &biases) -> Layers
+	{
+		return make_layers_impl(
+			biases, ::std::make_index_sequence<layer_count>{});
+	}
+
+	void register_layers()
+	{
+		template for (constexpr ::std::size_t I :
+					  ::std::views::iota(::std::size_t{}, layer_count))
+		{
+			this->register_module(::std::to_string(I),
+								  ::std::get<I>(layers_));
+		}
+	}
+
+	Layers layers_;
+};
+
+} // namespace detail
+
+template <ShapeLike Widths, DType dtype = DType::F32,
+		  Device device = Device::CPU>
+class TypedMLP
+	: public ::torch::nn::ModuleHolder<
+		  detail::TypedMLPImpl<Widths, dtype, device>>
+{
+public:
+	using Impl = detail::TypedMLPImpl<Widths, dtype, device>;
+	using Base = ::torch::nn::ModuleHolder<Impl>;
+	using Biases = typename Impl::Biases;
+	using Base::Base;
+
+	TypedMLP()
+		: Base()
+	{
+	}
+
+	explicit TypedMLP(bool with_bias)
+		: Base(with_bias)
+	{
+	}
+
+	explicit TypedMLP(Biases const &biases)
+		: Base(biases)
+	{
+	}
+
+	template <::std::size_t Index>
+	[[nodiscard]] inline auto get() noexcept -> auto &
+	{
+		return this->ptr()->template get<Index>();
+	}
+
+	template <::std::size_t Index>
+	[[nodiscard]] inline auto get() const noexcept -> auto const &
+	{
+		return this->ptr()->template get<Index>();
+	}
+
+	template <Device ndevice, DType ndtype = dtype>
+	[[nodiscard]] inline auto to() const
+	{
+		return TypedMLP<Widths, ndtype, ndevice>{
+			this->ptr()->template to<ndevice, ndtype>()};
+	}
+
+	template <DType ndtype>
+	[[nodiscard]] inline auto to() const
+	{
+		return to<device, ndtype>();
+	}
+
+	static constexpr ::std::size_t layer_count{Impl::layer_count};
+	static constexpr ::std::int64_t input_features{Impl::input_features};
+	static constexpr ::std::int64_t output_features{Impl::output_features};
+	static constexpr DType dtype_kind{dtype};
+	static constexpr Device device_kind{device};
+};
+
+} // namespace typetorch

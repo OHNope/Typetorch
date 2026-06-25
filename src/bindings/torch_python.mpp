@@ -1,15 +1,13 @@
-module;
-
-// 注意：这里不用 PyObject，不声明 _object，避免和 python module 冲突。
-// 全部用 void* 穿过 C ABI 边界。
-extern "C" bool typetorch_thp_tensor_check(void *object) noexcept;
-extern "C" void typetorch_thp_tensor_unpack(void *object, void *out_tensor);
-extern "C" void *typetorch_thp_tensor_wrap(void *tensor);
-
 export module torch_python;
 
 import libtorch;
 import python;
+
+
+extern "C" bool typetorch_thp_tensor_check(void *object) noexcept;
+extern "C" void typetorch_thp_tensor_unpack(void *object, void *out_tensor);
+extern "C" void *typetorch_thp_tensor_wrap(void *tensor);
+
 
 export namespace torch_python
 {

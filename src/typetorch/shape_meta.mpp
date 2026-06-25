@@ -666,6 +666,92 @@ consteval inline auto normalized_shape_compatible(
 	return true;
 }
 
+consteval inline auto floor_div(::std::int64_t numerator,
+								::std::int64_t denominator)
+	-> ::std::int64_t
+{
+	::std::int64_t quotient{numerator / denominator};
+	if (numerator % denominator < 0)
+	{
+		--quotient;
+	}
+	return quotient;
+}
+
+consteval inline auto pool2d_output_dim(
+	::std::int64_t input, ::std::int64_t kernel, ::std::int64_t stride,
+	::std::int64_t padding, ::std::int64_t dilation, bool ceil_mode)
+	-> ::std::int64_t
+{
+	if (input == dyn)
+	{
+		return dyn;
+	}
+
+	::std::int64_t const effective_kernel{
+		dilation * (kernel - 1) + 1};
+	::std::int64_t const numerator{
+		input + 2 * padding - effective_kernel +
+		(ceil_mode ? stride - 1 : 0)};
+	::std::int64_t output{floor_div(numerator, stride) + 1};
+
+	if (ceil_mode && (output - 1) * stride >= input + padding)
+	{
+		--output;
+	}
+	if (output <= 0)
+	{
+		throw "pool2d output spatial dimension must be positive";
+	}
+	return output;
+}
+
+consteval inline auto pool2d_shape_meta(
+	::std::span<::std::int64_t const> dims,
+	::std::span<::std::int64_t const> kernel_size,
+	::std::span<::std::int64_t const> stride,
+	::std::span<::std::int64_t const> padding,
+	::std::span<::std::int64_t const> dilation, bool ceil_mode)
+	-> ::std::meta::info
+{
+	if (dims.size() != 3 && dims.size() != 4)
+	{
+		throw "pool2d input rank must be 3 or 4";
+	}
+
+	::std::vector<::std::meta::info> args;
+	args.reserve(dims.size());
+	append_shape_range(args, 0, dims.size() - 2, dims);
+	append_dim(args, pool2d_output_dim(
+		dims[dims.size() - 2], kernel_size[0], stride[0], padding[0],
+		dilation[0], ceil_mode));
+	append_dim(args, pool2d_output_dim(
+		dims[dims.size() - 1], kernel_size[1], stride[1], padding[1],
+		dilation[1], ceil_mode));
+	return ::std::meta::substitute(^^Shape, args);
+}
+
+consteval inline auto adaptive_pool2d_shape_meta(
+	::std::span<::std::int64_t const> dims,
+	::std::span<::std::int64_t const> output_size) -> ::std::meta::info
+{
+	if (dims.size() != 3 && dims.size() != 4)
+	{
+		throw "adaptive pool2d input rank must be 3 or 4";
+	}
+
+	::std::vector<::std::meta::info> args;
+	args.reserve(dims.size());
+	append_shape_range(args, 0, dims.size() - 2, dims);
+	append_dim(args, output_size[0] == dyn
+						 ? dims[dims.size() - 2]
+						 : output_size[0]);
+	append_dim(args, output_size[1] == dyn
+						 ? dims[dims.size() - 1]
+						 : output_size[1]);
+	return ::std::meta::substitute(^^Shape, args);
+}
+
 consteval inline void check_contiguous_compiletime(Layout const layout)
 {
 	if (layout != Layout::Contiguous)

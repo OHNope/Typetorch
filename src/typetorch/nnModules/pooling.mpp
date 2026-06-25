@@ -1,0 +1,302 @@
+export module typetorch:nnModules_pooling;
+
+import std;
+import libtorch;
+import :types;
+import :shape_meta;
+import :common;
+import :tensor;
+
+#include "attributes.inc"
+
+export namespace typetorch
+{
+
+namespace detail
+{
+
+template <ShapeLike KernelSize, ShapeLike Stride, ShapeLike Padding,
+		  ShapeLike Dilation>
+consteval inline void check_pool2d_parameters()
+{
+	static_assert(KernelSize::rank == 2,
+				  "pool2d kernel_size must have rank 2");
+	static_assert(Stride::rank == 2, "pool2d stride must have rank 2");
+	static_assert(Padding::rank == 2, "pool2d padding must have rank 2");
+	static_assert(Dilation::rank == 2,
+				  "pool2d dilation must have rank 2");
+	static_assert(KernelSize::dynamic_rank == 0,
+				  "pool2d kernel_size must be fully static");
+	static_assert(Stride::dynamic_rank == 0,
+				  "pool2d stride must be fully static");
+	static_assert(Padding::dynamic_rank == 0,
+				  "pool2d padding must be fully static");
+	static_assert(Dilation::dynamic_rank == 0,
+				  "pool2d dilation must be fully static");
+	static_assert(KernelSize::dims[0] > 0 && KernelSize::dims[1] > 0,
+				  "pool2d kernel_size dimensions must be positive");
+	static_assert(Stride::dims[0] > 0 && Stride::dims[1] > 0,
+				  "pool2d stride dimensions must be positive");
+	static_assert(Padding::dims[0] >= 0 && Padding::dims[1] >= 0,
+				  "pool2d padding dimensions must be non-negative");
+	static_assert(Dilation::dims[0] > 0 && Dilation::dims[1] > 0,
+				  "pool2d dilation dimensions must be positive");
+	static_assert(Padding::dims[0] <= KernelSize::dims[0] / 2 &&
+					  Padding::dims[1] <= KernelSize::dims[1] / 2,
+				  "pool2d padding must not exceed half the kernel size");
+}
+
+template <ShapeLike ShapeKind>
+[[nodiscard]] constexpr inline auto shape2_array()
+	-> ::std::array<::std::int64_t, 2>
+{
+	return {ShapeKind::dims[0], ShapeKind::dims[1]};
+}
+
+template <ShapeLike KernelSize, ShapeLike Stride = KernelSize,
+		  ShapeLike Padding = Shape<0, 0>,
+		  ShapeLike Dilation = Shape<1, 1>, bool CeilMode = false>
+struct TypedMaxPool2dImpl : ::torch::nn::MaxPool2dImpl
+{
+	using ::torch::nn::MaxPool2dImpl::forward;
+
+	static_assert(
+		(check_pool2d_parameters<KernelSize, Stride, Padding, Dilation>(),
+		 true));
+
+	TypedMaxPool2dImpl()
+		: ::torch::nn::MaxPool2dImpl(make_options())
+	{
+	}
+
+	template <TensorLike Input>
+	[[nodiscard]] TYPETORCH_HOT inline auto forward(Input const &input)
+	{
+		using InputShape = typename Input::shape;
+		using ResultShape = typename[:pool2d_shape_meta(
+			InputShape::dims, KernelSize::dims, Stride::dims,
+			Padding::dims, Dilation::dims, CeilMode):];
+		using Result =
+			Tensor<ResultShape, Input::dtype, Input::device, Layout::Any>;
+		return Result::unsafe_move(
+			::torch::nn::MaxPool2dImpl::forward(input.unsafe_raw()));
+	}
+
+	template <Device, DType>
+	[[nodiscard]] inline auto to() const
+	{
+		return ::std::make_shared<TypedMaxPool2dImpl>();
+	}
+
+private:
+	[[nodiscard]] static inline auto make_options()
+		-> ::torch::nn::MaxPool2dOptions
+	{
+		return ::torch::nn::MaxPool2dOptions{shape2_array<KernelSize>()}
+			.stride(shape2_array<Stride>())
+			.padding(shape2_array<Padding>())
+			.dilation(shape2_array<Dilation>())
+			.ceil_mode(CeilMode);
+	}
+};
+
+template <ShapeLike KernelSize, ShapeLike Stride = KernelSize,
+		  ShapeLike Padding = Shape<0, 0>, bool CeilMode = false,
+		  bool CountIncludePad = true,
+		  ::std::int64_t DivisorOverride = 0>
+struct TypedAvgPool2dImpl : ::torch::nn::AvgPool2dImpl
+{
+	using ::torch::nn::AvgPool2dImpl::forward;
+
+	static_assert(
+		(check_pool2d_parameters<KernelSize, Stride, Padding,
+								 Shape<1, 1>>(),
+		 true));
+	static_assert(DivisorOverride >= 0,
+				  "AvgPool2d divisor_override must be positive or zero");
+
+	TypedAvgPool2dImpl()
+		: ::torch::nn::AvgPool2dImpl(make_options())
+	{
+	}
+
+	template <TensorLike Input>
+	[[nodiscard]] TYPETORCH_HOT inline auto forward(Input const &input)
+	{
+		static_assert(Input::dtype == DType::Any ||
+						  ::typetorch::detail::is_floating_dtype(Input::dtype),
+					  "AvgPool2d input requires floating tensor dtype");
+		using InputShape = typename Input::shape;
+		using ResultShape = typename[:pool2d_shape_meta(
+			InputShape::dims, KernelSize::dims, Stride::dims,
+			Padding::dims, Shape<1, 1>::dims, CeilMode):];
+		using Result =
+			Tensor<ResultShape, Input::dtype, Input::device, Layout::Any>;
+		return Result::unsafe_move(
+			::torch::nn::AvgPool2dImpl::forward(input.unsafe_raw()));
+	}
+
+	template <Device, DType>
+	[[nodiscard]] inline auto to() const
+	{
+		return ::std::make_shared<TypedAvgPool2dImpl>();
+	}
+
+private:
+	[[nodiscard]] static inline auto make_options()
+		-> ::torch::nn::AvgPool2dOptions
+	{
+		auto options{
+			::torch::nn::AvgPool2dOptions{shape2_array<KernelSize>()}
+				.stride(shape2_array<Stride>())
+				.padding(shape2_array<Padding>())
+				.ceil_mode(CeilMode)
+				.count_include_pad(CountIncludePad)};
+		if constexpr (DivisorOverride > 0)
+		{
+			options.divisor_override(DivisorOverride);
+		}
+		return options;
+	}
+};
+
+template <ShapeLike OutputSize>
+struct TypedAdaptiveAvgPool2dImpl
+	: ::torch::nn::AdaptiveAvgPool2dImpl
+{
+	using ::torch::nn::AdaptiveAvgPool2dImpl::forward;
+
+	static_assert(OutputSize::rank == 2,
+				  "AdaptiveAvgPool2d output_size must have rank 2");
+	static_assert(
+		(OutputSize::dims[0] > 0 || OutputSize::dims[0] == dyn) &&
+			(OutputSize::dims[1] > 0 || OutputSize::dims[1] == dyn),
+		"AdaptiveAvgPool2d output dimensions must be positive or dyn");
+
+	TypedAdaptiveAvgPool2dImpl()
+		: ::torch::nn::AdaptiveAvgPool2dImpl(make_options())
+	{
+	}
+
+	template <TensorLike Input>
+	[[nodiscard]] TYPETORCH_HOT inline auto forward(Input const &input)
+	{
+		static_assert(Input::dtype == DType::Any ||
+						  ::typetorch::detail::is_floating_dtype(Input::dtype),
+					  "AdaptiveAvgPool2d input requires floating tensor dtype");
+		using InputShape = typename Input::shape;
+		using ResultShape = typename[:adaptive_pool2d_shape_meta(
+			InputShape::dims, OutputSize::dims):];
+		using Result =
+			Tensor<ResultShape, Input::dtype, Input::device, Layout::Any>;
+		return Result::unsafe_move(
+			::torch::nn::AdaptiveAvgPool2dImpl::forward(
+				input.unsafe_raw()));
+	}
+
+	template <Device, DType>
+	[[nodiscard]] inline auto to() const
+	{
+		return ::std::make_shared<TypedAdaptiveAvgPool2dImpl>();
+	}
+
+private:
+	[[nodiscard]] static inline auto make_options()
+		-> ::torch::nn::AdaptiveAvgPool2dOptions
+	{
+		using Optional = ::std::optional<::std::int64_t>;
+		::std::array<Optional, 2> const output_size{
+			OutputSize::dims[0] == dyn
+				? Optional{}
+				: Optional{OutputSize::dims[0]},
+			OutputSize::dims[1] == dyn
+				? Optional{}
+				: Optional{OutputSize::dims[1]}};
+		return ::torch::nn::AdaptiveAvgPool2dOptions{output_size};
+	}
+};
+
+} // namespace detail
+
+template <ShapeLike KernelSize, ShapeLike Stride = KernelSize,
+		  ShapeLike Padding = Shape<0, 0>,
+		  ShapeLike Dilation = Shape<1, 1>, bool CeilMode = false>
+class MaxPool2d
+	: public ::torch::nn::ModuleHolder<detail::TypedMaxPool2dImpl<
+		  KernelSize, Stride, Padding, Dilation, CeilMode>>
+{
+public:
+	using Impl = detail::TypedMaxPool2dImpl<
+		KernelSize, Stride, Padding, Dilation, CeilMode>;
+	using Base = ::torch::nn::ModuleHolder<Impl>;
+	using Base::Base;
+
+	template <Device ndevice, DType ndtype>
+	[[nodiscard]] inline auto to() const
+	{
+		return MaxPool2d{
+			this->ptr()->template to<ndevice, ndtype>()};
+	}
+
+	template <DType>
+	[[nodiscard]] inline auto to() const
+	{
+		return MaxPool2d{};
+	}
+};
+
+template <ShapeLike KernelSize, ShapeLike Stride = KernelSize,
+		  ShapeLike Padding = Shape<0, 0>, bool CeilMode = false,
+		  bool CountIncludePad = true,
+		  ::std::int64_t DivisorOverride = 0>
+class AvgPool2d
+	: public ::torch::nn::ModuleHolder<detail::TypedAvgPool2dImpl<
+		  KernelSize, Stride, Padding, CeilMode, CountIncludePad,
+		  DivisorOverride>>
+{
+public:
+	using Impl = detail::TypedAvgPool2dImpl<
+		KernelSize, Stride, Padding, CeilMode, CountIncludePad,
+		DivisorOverride>;
+	using Base = ::torch::nn::ModuleHolder<Impl>;
+	using Base::Base;
+
+	template <Device ndevice, DType ndtype>
+	[[nodiscard]] inline auto to() const
+	{
+		return AvgPool2d{
+			this->ptr()->template to<ndevice, ndtype>()};
+	}
+
+	template <DType>
+	[[nodiscard]] inline auto to() const
+	{
+		return AvgPool2d{};
+	}
+};
+
+template <ShapeLike OutputSize>
+class AdaptiveAvgPool2d
+	: public ::torch::nn::ModuleHolder<
+		  detail::TypedAdaptiveAvgPool2dImpl<OutputSize>>
+{
+public:
+	using Impl = detail::TypedAdaptiveAvgPool2dImpl<OutputSize>;
+	using Base = ::torch::nn::ModuleHolder<Impl>;
+	using Base::Base;
+
+	template <Device ndevice, DType ndtype>
+	[[nodiscard]] inline auto to() const
+	{
+		return AdaptiveAvgPool2d{
+			this->ptr()->template to<ndevice, ndtype>()};
+	}
+
+	template <DType>
+	[[nodiscard]] inline auto to() const
+	{
+		return AdaptiveAvgPool2d{};
+	}
+};
+
+} // namespace typetorch

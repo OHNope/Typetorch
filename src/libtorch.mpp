@@ -36,6 +36,7 @@ using ::torch::gelu_;
 using ::torch::get_num_threads;
 using ::torch::gt;
 using ::torch::layer_norm;
+using ::torch::relu;
 using ::torch::ones;
 using ::torch::cat;
 using ::torch::stack;
@@ -65,6 +66,15 @@ using ::torch::nn::Sequential;
 using ::torch::nn::LayerNorm;
 using ::torch::nn::Conv2dImpl;
 using ::torch::nn::Conv2dOptions;
+using ::torch::nn::MaxPool2dImpl;
+using ::torch::nn::MaxPool2d;
+using ::torch::nn::MaxPool2dOptions;
+using ::torch::nn::AvgPool2dOptions;
+using ::torch::nn::AvgPool2d;
+using ::torch::nn::AvgPool2dImpl;
+using ::torch::nn::AdaptiveAvgPool2d;
+using ::torch::nn::AdaptiveAvgPool2dOptions;
+using ::torch::nn::AdaptiveAvgPool2dImpl;
 } // namespace nn
 } // namespace torch
 

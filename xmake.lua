@@ -104,6 +104,10 @@ local typetorch_module_files = {
     "src/typetorch/nnModules/layer_norm.mpp",
     "src/typetorch/nnModules/rms_norm.mpp",
     "src/typetorch/nnModules/sequential.mpp",
+    "src/typetorch/nnModules/mlp.mpp",
+    "src/typetorch/nnModules/activation.mpp",
+    "src/typetorch/nnModules/flatten.mpp",
+    "src/typetorch/nnModules/pooling.mpp",
     "src/typetorch/nnModules/nnModules.mpp",
     "src/typetorch/typetorch.mpp"
 }
@@ -293,6 +297,22 @@ target("typetorch_forwarding_benchmark")
     })
 target_end()
 
+local function configure_remove_cvref_benchmark(source)
+    set_default(false)
+    set_kind("binary")
+    add_files(source)
+    add_includedirs("tests")
+    add_mode_flags()
+end
+
+target("remove_cvref_trait_benchmark")
+    configure_remove_cvref_benchmark("tests/remove_cvref_trait_benchmark.cpp")
+target_end()
+
+target("remove_cvref_meta_benchmark")
+    configure_remove_cvref_benchmark("tests/remove_cvref_meta_benchmark.cpp")
+target_end()
+
 target("binary_size_tensor_probe")
     configure_libtorch_target({
         default = false,
@@ -367,6 +387,27 @@ target("typetorch_nnmodules_sequential_test")
     configure_libtorch_target({
         default = false,
         files = {"tests/nnmodules/sequential_test.cpp"},
+    })
+target_end()
+
+target("typetorch_nnmodules_mlp_test")
+    configure_libtorch_target({
+        default = false,
+        files = {"tests/nnmodules/mlp_test.cpp"},
+    })
+target_end()
+
+target("typetorch_nnmodules_wrappers_test")
+    configure_libtorch_target({
+        default = false,
+        files = {"tests/nnmodules/wrappers_test.cpp"},
+    })
+target_end()
+
+target("typetorch_nnmodules_pooling_test")
+    configure_libtorch_target({
+        default = false,
+        files = {"tests/nnmodules/pooling_test.cpp"},
     })
 target_end()
 

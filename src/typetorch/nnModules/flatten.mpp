@@ -1,0 +1,78 @@
+export module typetorch:nnModules_flatten;
+
+import std;
+import libtorch;
+import :types;
+import :shape_meta;
+import :tensor;
+
+#include "attributes.inc"
+
+export namespace typetorch
+{
+
+namespace detail
+{
+
+template <::std::int64_t StartDim, ::std::int64_t EndDim>
+struct TypedFlattenImpl : ::torch::nn::Module
+{
+	[[nodiscard]] TYPETORCH_HOT inline auto
+	forward(::torch::Tensor const &input)
+	{
+		return input.flatten(StartDim, EndDim);
+	}
+
+	template <TensorLike Input>
+	[[nodiscard]] TYPETORCH_HOT inline auto forward(Input const &input)
+	{
+		using InputShape = typename Input::shape;
+		using ResultShape = typename[:flatten_shape_meta(
+			InputShape::dims, StartDim, EndDim):];
+		using Result =
+			Tensor<ResultShape, Input::dtype, Input::device,
+				   Input::layout == Layout::Contiguous
+					   ? Layout::Contiguous
+					   : Layout::Any>;
+		return Result::unsafe_move(
+			input.unsafe_raw().flatten(StartDim, EndDim));
+	}
+
+	template <Device, DType>
+	[[nodiscard]] inline auto to() const
+	{
+		return ::std::make_shared<
+			TypedFlattenImpl<StartDim, EndDim>>();
+	}
+};
+
+} // namespace detail
+
+template <::std::int64_t StartDim = 1, ::std::int64_t EndDim = -1>
+class Flatten
+	: public ::torch::nn::ModuleHolder<
+		  detail::TypedFlattenImpl<StartDim, EndDim>>
+{
+public:
+	using Impl = detail::TypedFlattenImpl<StartDim, EndDim>;
+	using Base = ::torch::nn::ModuleHolder<Impl>;
+	using Base::Base;
+
+	template <Device ndevice, DType ndtype>
+	[[nodiscard]] inline auto to() const
+	{
+		return Flatten{
+			this->ptr()->template to<ndevice, ndtype>()};
+	}
+
+	template <DType>
+	[[nodiscard]] inline auto to() const
+	{
+		return Flatten{};
+	}
+
+	static constexpr ::std::int64_t start_dim{StartDim};
+	static constexpr ::std::int64_t end_dim{EndDim};
+};
+
+} // namespace typetorch

@@ -21,9 +21,9 @@ concept TypedModuleHolder =
 
 
 template <typename Input, TypedModuleHolder Module>
-using SequentialStepOutput = ::std::remove_cvref_t<
-	decltype(::std::declval<typename Module::Impl &>().forward(
-		::std::declval<Input const &>()))>;
+using SequentialStepOutput = [: ::std::meta::remove_cvref(
+	^^decltype(::std::declval<typename Module::Impl &>().forward(
+		::std::declval<Input const &>()))) :];
 
 /*
  * Template-trait fallback retained for comparison with the consteval
@@ -126,7 +126,8 @@ struct TypedSequentialImpl : ::torch::nn::Module
 	[[nodiscard]] inline auto push_back(NewModule module) const
 	{
 		using ResultImpl =
-			TypedSequentialImpl<Modules..., ::std::remove_cvref_t<NewModule>>;
+			TypedSequentialImpl<
+				Modules..., typename[: ::std::meta::remove_cvref(^^NewModule) :]>;
 		return ::std::apply(
 			[&module](auto const &...modules) {
 				return ::std::make_shared<ResultImpl>(
@@ -189,7 +190,8 @@ public:
 	[[nodiscard]] inline auto push_back(NewModule module) const
 	{
 		using Result =
-			Sequential<Modules..., ::std::remove_cvref_t<NewModule>>;
+			Sequential<
+				Modules..., typename[: ::std::meta::remove_cvref(^^NewModule) :]>;
 		return Result{this->ptr()->push_back(::std::move(module))};
 	}
 
@@ -207,6 +209,7 @@ public:
 
 template <class... Modules>
 	requires(sizeof...(Modules) > 0)
-Sequential(Modules...) -> Sequential<::std::remove_cvref_t<Modules>...>;
+Sequential(Modules...)
+	-> Sequential<typename[: ::std::meta::remove_cvref(^^Modules) :]...>;
 
 } // namespace typetorch
