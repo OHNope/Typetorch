@@ -67,6 +67,13 @@ struct TypedRMSNormImpl
 			x.unsafe_raw(), NormalizedShape::dims, weight, eps_));
 	}
 
+	[[nodiscard]] TYPETORCH_HOT inline auto
+	forward(::torch::Tensor const &x) -> ::torch::Tensor
+	{
+		return ::torch::rms_norm(
+			x, NormalizedShape::dims, weight, eps_);
+	}
+
 	template <Device ndevice, DType ndtype = dtype>
 	[[nodiscard]] inline auto to() const
 	{

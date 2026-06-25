@@ -21,6 +21,8 @@ template <::std::int64_t In, ::std::int64_t Out,
 		  DType dtype = DType::F32, Device device = Device::CPU>
 struct TypedLinearImpl : ::torch::nn::LinearImpl
 {
+	using ::torch::nn::LinearImpl::forward;
+
 	static_assert(In >= 0, "Linear in_features must be non-negative");
 	static_assert(Out >= 0, "Linear out_features must be non-negative");
 	static_assert(dtype != DType::Any,
@@ -104,6 +106,11 @@ class Linear
 public:
 	using Impl = detail::TypedLinearImpl<In, Out, dtype, device>;
 	using ::torch::nn::ModuleHolder<Impl>::ModuleHolder;
+
+	static constexpr ::std::int64_t in_features{In};
+	static constexpr ::std::int64_t out_features{Out};
+	static constexpr DType dtype_kind{dtype};
+	static constexpr Device device_kind{device};
 
 	template <Device ndevice, DType ndtype = dtype>
 	[[nodiscard]] inline auto to() const

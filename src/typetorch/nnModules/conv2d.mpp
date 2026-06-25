@@ -24,6 +24,8 @@ template <::std::int64_t InChannels, ::std::int64_t OutChannels,
 		  DType dtype = DType::F32, Device device = Device::CPU>
 struct TypedConv2dImpl : ::torch::nn::Conv2dImpl
 {
+	using ::torch::nn::Conv2dImpl::forward;
+
 	static_assert(InChannels > 0, "Conv2d in_channels must be positive");
 	static_assert(OutChannels > 0, "Conv2d out_channels must be positive");
 	static_assert(KernelSize::rank == 2, "Conv2d kernel_size must have rank 2");
@@ -173,6 +175,12 @@ public:
 		InChannels, OutChannels, KernelSize, Stride, Padding, Dilation, Groups,
 		dtype, device>;
 	using ::torch::nn::ModuleHolder<Impl>::ModuleHolder;
+
+	static constexpr ::std::int64_t in_channels{InChannels};
+	static constexpr ::std::int64_t out_channels{OutChannels};
+	static constexpr ::std::int64_t groups{Groups};
+	static constexpr DType dtype_kind{dtype};
+	static constexpr Device device_kind{device};
 
 	template <Device ndevice, DType ndtype = dtype>
 	[[nodiscard]] inline auto to() const

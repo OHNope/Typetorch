@@ -21,6 +21,8 @@ template <::std::int64_t NumEmbeddings, ::std::int64_t EmbeddingDim,
 		  DType dtype = DType::F32, Device device = Device::CPU>
 struct TypedEmbeddingImpl : ::torch::nn::EmbeddingImpl
 {
+	using ::torch::nn::EmbeddingImpl::forward;
+
 	static_assert(NumEmbeddings >= 0,
 				  "Embedding num_embeddings must be non-negative");
 	static_assert(EmbeddingDim >= 0,

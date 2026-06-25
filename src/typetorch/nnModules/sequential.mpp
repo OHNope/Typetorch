@@ -3,6 +3,7 @@ export module typetorch:nnModules_sequential;
 import std;
 import libtorch;
 import :types;
+import :nnModules_core;
 
 export namespace typetorch
 {
@@ -12,12 +13,66 @@ namespace detail
 
 template <class ModuleKind>
 concept TypedModuleHolder =
-	requires(ModuleKind const &module)
-	{
+	requires(ModuleKind const &module) {
 		typename ModuleKind::Impl;
 		module.ptr();
 	} &&
 	::std::derived_from<typename ModuleKind::Impl, ::torch::nn::Module>;
+
+
+template <typename Input, TypedModuleHolder Module>
+using SequentialStepOutput = ::std::remove_cvref_t<
+	decltype(::std::declval<typename Module::Impl &>().forward(
+		::std::declval<Input const &>()))>;
+
+/*
+ * Template-trait fallback retained for comparison with the consteval
+ * reflection implementation below.
+ *
+ * template <typename Input, TypedModuleHolder... Modules>
+ * struct SequentialOutput;
+ *
+ * template <typename Input, TypedModuleHolder Module>
+ * struct SequentialOutput<Input, Module>
+ * {
+ *     using type = SequentialStepOutput<Input, Module>;
+ *     static_assert(
+ *         TensorLike<type>,
+ *         "Sequential modules must return a single typed Tensor");
+ * };
+ *
+ * template <typename Input, TypedModuleHolder First,
+ *           TypedModuleHolder Second, TypedModuleHolder... Rest>
+ * struct SequentialOutput<Input, First, Second, Rest...>
+ * {
+ *     using Step = SequentialStepOutput<Input, First>;
+ *     static_assert(
+ *         TensorLike<Step>,
+ *         "Sequential modules must return a single typed Tensor");
+ *     using type = typename SequentialOutput<Step, Second, Rest...>::type;
+ * };
+ */
+
+template <::std::meta::info Input, ::std::meta::info Module,
+		  ::std::meta::info... Rest>
+consteval inline auto sequential_output_meta() -> ::std::meta::info
+{
+	constexpr auto output = ::std::meta::substitute(
+		^^SequentialStepOutput, {
+									Input, Module});
+	using Output = typename[:output:];
+	static_assert(TensorLike<Output>,
+				  "Sequential modules must return a single typed Tensor");
+
+	if constexpr (sizeof...(Rest) == 0)
+	{
+		return output;
+	}
+	else
+	{
+		return sequential_output_meta<output, Rest...>();
+	}
+};
 
 template <TypedModuleHolder... Modules>
 	requires(sizeof...(Modules) > 0)
@@ -26,13 +81,29 @@ struct TypedSequentialImpl : ::torch::nn::Module
 	explicit TypedSequentialImpl(Modules... modules)
 		: modules_{::std::move(modules)...}
 	{
-		register_modules(::std::index_sequence_for<Modules...>{});
+		template for (constexpr ::std::size_t I :
+					  ::std::views::iota(::std::size_t{}, sizeof...(Modules)))
+		{
+			this->register_module(::std::to_string(I),
+								  ::std::get<I>(modules_));
+		}
 	}
 
 	template <TensorLike Input>
 	[[nodiscard]] inline auto forward(Input const &input)
 	{
-		return forward_at<0>(input);
+		using Result =
+			typename[:sequential_output_meta<^^Input, ^^Modules...>():];
+		::torch::Tensor output{
+			input.unsafe_raw().clone()};
+
+		template for (constexpr ::std::size_t I :
+					  ::std::views::iota(::std::size_t{},
+										sizeof...(Modules) - 1)) // output type would change every time, if output -> local auto var
+		{
+			output = ::std::get<I>(modules_)->forward(output);
+		}
+		return Result::unsafe_move(::std::get<sizeof...(Modules) - 1>(modules_)->forward(output));
 	}
 
 	template <::std::size_t Index>
@@ -54,67 +125,33 @@ struct TypedSequentialImpl : ::torch::nn::Module
 	template <TypedModuleHolder NewModule>
 	[[nodiscard]] inline auto push_back(NewModule module) const
 	{
-		return push_back_impl(::std::move(module),
-							  ::std::index_sequence_for<Modules...>{});
+		using ResultImpl =
+			TypedSequentialImpl<Modules..., ::std::remove_cvref_t<NewModule>>;
+		return ::std::apply(
+			[&module](auto const &...modules) {
+				return ::std::make_shared<ResultImpl>(
+					modules..., ::std::move(module));
+			},
+			modules_);
 	}
 
 	template <Device ndevice, DType ndtype>
 	[[nodiscard]] inline auto to() const
 	{
-		return to_impl<ndevice, ndtype>(
-			::std::index_sequence_for<Modules...>{});
+		using ResultImpl = TypedSequentialImpl<
+			decltype(::std::declval<Modules const &>()
+						 .template to<ndevice, ndtype>())...>;
+		return ::std::apply(
+			[](auto const &...modules) {
+				return ::std::make_shared<ResultImpl>(
+					modules.template to<ndevice, ndtype>()...);
+			},
+			modules_);
 	}
 
 	static constexpr ::std::size_t size{sizeof...(Modules)};
 
 private:
-	template <::std::size_t Index, TensorLike Input>
-	[[nodiscard]] inline auto forward_at(Input const &input)
-	{
-		auto output{::std::get<Index>(modules_)->forward(input)};
-		static_assert(TensorLike<decltype(output)>,
-					  "Sequential modules must return a single typed Tensor");
-
-		if constexpr (Index + 1 == sizeof...(Modules))
-		{
-			return output;
-		}
-		else
-		{
-			return forward_at<Index + 1>(output);
-		}
-	}
-
-	template <::std::size_t... Indices>
-	inline void register_modules(::std::index_sequence<Indices...>)
-	{
-		(this->register_module(::std::to_string(Indices),
-							   ::std::get<Indices>(modules_)),
-		 ...);
-	}
-
-	template <TypedModuleHolder NewModule, ::std::size_t... Indices>
-	[[nodiscard]] inline auto
-	push_back_impl(NewModule module,
-				   ::std::index_sequence<Indices...>) const
-	{
-		using ResultImpl =
-			TypedSequentialImpl<Modules..., ::std::remove_cvref_t<NewModule>>;
-		return ::std::make_shared<ResultImpl>(
-			::std::get<Indices>(modules_)..., ::std::move(module));
-	}
-
-	template <Device ndevice, DType ndtype, ::std::size_t... Indices>
-	[[nodiscard]] inline auto
-	to_impl(::std::index_sequence<Indices...>) const
-	{
-		using ResultImpl = TypedSequentialImpl<
-			decltype(::std::get<Indices>(modules_)
-						 .template to<ndevice, ndtype>())...>;
-		return ::std::make_shared<ResultImpl>(
-			::std::get<Indices>(modules_).template to<ndevice, ndtype>()...);
-	}
-
 	::std::tuple<Modules...> modules_;
 };
 

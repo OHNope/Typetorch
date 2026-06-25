@@ -262,12 +262,10 @@ public:
     template <::std::int64_t Dim>
     [[nodiscard]] inline auto unsqueeze() const;
 
-    static inline auto parameter_options() -> ::torch::TensorOptions
-    {
-        return ::torch::TensorOptions{}
+    static inline ::torch::TensorOptions const factory_options{
+        ::torch::TensorOptions{}
             .dtype(detail::to_torch_dtype(dtype))
-            .device(detail::to_torch_device(device));
-    }
+            .device(detail::to_torch_device(device))};
 
 private:
     consteval static inline void check_factory_layout_compiletime() noexcept

@@ -21,6 +21,8 @@ template <ShapeLike NormalizedShape, DType dtype = DType::F32,
 		  Device device = Device::CPU>
 struct TypedLayerNormImpl : ::torch::nn::LayerNormImpl
 {
+	using ::torch::nn::LayerNormImpl::forward;
+
 	static_assert(NormalizedShape::rank > 0,
 				  "LayerNorm requires a non-empty normalized shape");
 	static_assert(dtype != DType::Any,
@@ -35,7 +37,7 @@ struct TypedLayerNormImpl : ::torch::nn::LayerNormImpl
 		: ::torch::nn::LayerNormImpl(
 			  ::torch::nn::LayerNormOptions(
 				  ::std::vector<::std::int64_t>(
-					  NormalizedShape::dims.begin(), NormalizedShape::dims.end()))
+					  NormalizedShape::dims, NormalizedShape::dims + NormalizedShape::rank))
 				  .eps(eps)
 				  .elementwise_affine(elementwise_affine)),
 		  cudnn_enable_{cudnn_enable}

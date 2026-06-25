@@ -14,19 +14,6 @@ export namespace typetorch
 namespace detail
 {
 
-template <::std::size_t const N>
-consteval inline auto make_index_array()
-{
-	::std::array<::std::size_t, N> a{};
-
-	for (::std::size_t i{0}; i < N; ++i)
-	{
-		a[i] = i;
-	}
-
-	return a;
-}
-
 consteval inline auto member_nums(::std::meta::info const class_info) noexcept
 {
 	constexpr auto ctx{::std::meta::access_context::current()};

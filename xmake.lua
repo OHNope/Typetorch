@@ -328,6 +328,48 @@ target("typetorch_tensor_arithmetic_test")
         files = {"tests/tensor_arithmetic_test.cpp"},
     })
 target_end()
+target("typetorch_nnmodules_linear_test")
+    configure_libtorch_target({
+        default = false,
+        files = {"tests/nnmodules/linear_test.cpp"},
+    })
+target_end()
+
+target("typetorch_nnmodules_conv2d_test")
+    configure_libtorch_target({
+        default = false,
+        files = {"tests/nnmodules/conv2d_test.cpp"},
+    })
+target_end()
+
+target("typetorch_nnmodules_embedding_test")
+    configure_libtorch_target({
+        default = false,
+        files = {"tests/nnmodules/embedding_test.cpp"},
+    })
+target_end()
+
+target("typetorch_nnmodules_layer_norm_test")
+    configure_libtorch_target({
+        default = false,
+        files = {"tests/nnmodules/layer_norm_test.cpp"},
+    })
+target_end()
+
+target("typetorch_nnmodules_rms_norm_test")
+    configure_libtorch_target({
+        default = false,
+        files = {"tests/nnmodules/rms_norm_test.cpp"},
+    })
+target_end()
+
+target("typetorch_nnmodules_sequential_test")
+    configure_libtorch_target({
+        default = false,
+        files = {"tests/nnmodules/sequential_test.cpp"},
+    })
+target_end()
+
 
 target("typetorch_sdk")
     configure_libtorch_target({
