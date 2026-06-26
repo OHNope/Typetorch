@@ -84,8 +84,9 @@ local libtorch_variant = os.getenv("TYPETORCH_LIBTORCH_VARIANT") or "cu128"
 local libtorch_version = libtorch_variant == "cpu" and "2.8.0+cpu" or "2.8.0+cu128"
 add_requires("libtorch-bin " .. libtorch_version, {alias = "libtorch"})
 
+local libtorch_module_file = "src/libtorch.mpp"
+
 local typetorch_module_files = {
-    "src/libtorch.mpp",
     "src/typetorch/types.mpp",
     "src/typetorch/torch_mappings.mpp",
     "src/typetorch/shape_meta.mpp",
@@ -117,9 +118,13 @@ local typetorch_examples_module_files = {
     "src/examples/examples.cpp",
 }
 
+local function add_libtorch_module()
+    add_files(libtorch_module_file, {public = true})
+end
+
 local function add_typetorch_modules()
     for _, file in ipairs(typetorch_module_files) do
-        add_files(file)
+        add_files(file, {public = true})
     end
 end
 
@@ -250,8 +255,9 @@ local function add_mode_flags()
 end
 
 local function add_fast_io()
-    add_files("src/fast_io.mpp", "src/fast_io.cpp")
-    add_includedirs("third_party/fast_io/include")
+    add_files("src/fast_io.mpp", {public = true})
+    add_files("src/fast_io.cpp")
+    add_includedirs("third_party/fast_io/include", {public = true})
 end
 
 local function add_target_files(files)
@@ -267,18 +273,19 @@ local function configure_libtorch_target(config)
     end
     set_kind(config.kind or "binary")
     add_rules("libtorch_runtime", config.python_rule or "python_headers")
-    add_packages("libtorch")
-    add_includedirs("src")
+    add_packages("libtorch", {public = true})
+    add_includedirs("src", {public = true})
     if config.torch_python then
         add_links("torch_python")
     end
     if config.root_includedir then
         add_includedirs(".")
     end
-    if config.libtorch_module_only then
-        add_files("src/libtorch.mpp")
-    else
-        add_typetorch_modules()
+    if config.modules ~= false then
+        add_libtorch_module()
+        if not config.libtorch_module_only then
+            add_typetorch_modules()
+        end
     end
     if config.fast_io ~= false then
         add_fast_io()
@@ -291,6 +298,21 @@ local function configure_libtorch_target(config)
     add_mode_flags()
 end
 
+local function configure_typetorch_consumer_target(config)
+    config = config or {}
+    config.modules = false
+    config.fast_io = false
+    configure_libtorch_target(config)
+    add_deps("typetorch_sdk")
+end
+
+target("typetorch_sdk")
+    configure_libtorch_target({
+        kind = "static",
+        default = false,
+    })
+target_end()
+
 target("typetorch_cpp_debug")
     configure_libtorch_target({
         examples = true,
@@ -299,115 +321,106 @@ target("typetorch_cpp_debug")
 target_end()
 
 target("typetorch_forwarding_benchmark")
-    configure_libtorch_target({
+    configure_typetorch_consumer_target({
         default = false,
         files = {"benchmarks/forwarding_benchmark.cpp"},
     })
 target_end()
 
 target("binary_size_tensor_probe")
-    configure_libtorch_target({
+    configure_typetorch_consumer_target({
         default = false,
         files = {"tests/binary_size_tensor_probe.cpp"},
     })
 target_end()
 
 target("binary_size_tensor_checked_probe")
-    configure_libtorch_target({
+    configure_typetorch_consumer_target({
         default = false,
         files = {"tests/binary_size_tensor_checked_probe.cpp"},
     })
 target_end()
 
 target("binary_size_tensor_unsafe_probe")
-    configure_libtorch_target({
+    configure_typetorch_consumer_target({
         default = false,
         files = {"tests/binary_size_tensor_unsafe_probe.cpp"},
     })
 target_end()
 
 target("binary_size_libtorch_probe")
-    configure_libtorch_target({
+    configure_typetorch_consumer_target({
         default = false,
-        libtorch_module_only = true,
         files = {"tests/binary_size_libtorch_probe.cpp"},
     })
 target_end()
 
 target("typetorch_tensor_arithmetic_test")
-    configure_libtorch_target({
+    configure_typetorch_consumer_target({
         default = false,
         files = {"tests/tensor_arithmetic_test.cpp"},
     })
 target_end()
 target("typetorch_nnmodules_linear_test")
-    configure_libtorch_target({
+    configure_typetorch_consumer_target({
         default = false,
         files = {"tests/nnmodules/linear_test.cpp"},
     })
 target_end()
 
 target("typetorch_nnmodules_conv2d_test")
-    configure_libtorch_target({
+    configure_typetorch_consumer_target({
         default = false,
         files = {"tests/nnmodules/conv2d_test.cpp"},
     })
 target_end()
 
 target("typetorch_nnmodules_embedding_test")
-    configure_libtorch_target({
+    configure_typetorch_consumer_target({
         default = false,
         files = {"tests/nnmodules/embedding_test.cpp"},
     })
 target_end()
 
 target("typetorch_nnmodules_layer_norm_test")
-    configure_libtorch_target({
+    configure_typetorch_consumer_target({
         default = false,
         files = {"tests/nnmodules/layer_norm_test.cpp"},
     })
 target_end()
 
 target("typetorch_nnmodules_rms_norm_test")
-    configure_libtorch_target({
+    configure_typetorch_consumer_target({
         default = false,
         files = {"tests/nnmodules/rms_norm_test.cpp"},
     })
 target_end()
 
 target("typetorch_nnmodules_sequential_test")
-    configure_libtorch_target({
+    configure_typetorch_consumer_target({
         default = false,
         files = {"tests/nnmodules/sequential_test.cpp"},
     })
 target_end()
 
 target("typetorch_nnmodules_mlp_test")
-    configure_libtorch_target({
+    configure_typetorch_consumer_target({
         default = false,
         files = {"tests/nnmodules/mlp_test.cpp"},
     })
 target_end()
 
 target("typetorch_nnmodules_wrappers_test")
-    configure_libtorch_target({
+    configure_typetorch_consumer_target({
         default = false,
         files = {"tests/nnmodules/wrappers_test.cpp"},
     })
 target_end()
 
 target("typetorch_nnmodules_pooling_test")
-    configure_libtorch_target({
+    configure_typetorch_consumer_target({
         default = false,
         files = {"tests/nnmodules/pooling_test.cpp"},
-    })
-target_end()
-
-
-target("typetorch_sdk")
-    configure_libtorch_target({
-        kind = "static",
-        default = false,
     })
 target_end()
 
