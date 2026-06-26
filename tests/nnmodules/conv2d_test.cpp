@@ -3,23 +3,14 @@ import libtorch;
 import typetorch;
 import fast_io;
 
+#include "../test_support.inc"
+
 namespace {
 
 using BatchInput = typetorch::Tensor<typetorch::Shape<2, 3, 8, 8>, typetorch::DType::F32,
                                       typetorch::Device::CPU, typetorch::Layout::Contiguous>;
 
-auto options() -> ::torch::TensorOptions {
-    return ::torch::TensorOptions{}.dtype(::torch::kFloat).device(::torch::kCPU);
-}
 
-void expect_allclose(char const* name, ::torch::Tensor const& actual,
-                     ::torch::Tensor const& expected) {
-    if (!::torch::allclose(actual, expected)) {
-        ::fast_io::io::perrln(name, " mismatch; actual=", actual.toString(),
-                               ", expected=", expected.toString());
-        ::std::exit(1);
-    }
-}
 
 } // namespace
 
@@ -34,11 +25,11 @@ int main() {
         typed->weight.set_data(raw->weight);
         typed->bias.set_data(raw->bias);
 
-        auto input = ::torch::randn({2, 3, 8, 8}, options());
+        auto input = ::torch::randn({2, 3, 8, 8}, typetorch_test::f32_cpu_options());
         auto expected = raw->forward(input);
         auto actual = typed->forward(BatchInput::unsafe_retain(input));
 
-        expect_allclose("conv2d_default", actual.unsafe_raw(), expected);
+        typetorch_test::expect_allclose("conv2d_default", actual.unsafe_raw(), expected);
     }
 
     // --- Test 2: forward with stride=2, pad=1, no bias ---
@@ -52,11 +43,11 @@ int main() {
 
         typed->weight.set_data(raw->weight);
 
-        auto input = ::torch::randn({2, 3, 8, 8}, options());
+        auto input = ::torch::randn({2, 3, 8, 8}, typetorch_test::f32_cpu_options());
         auto expected = raw->forward(input);
         auto actual = typed->forward(BatchInput::unsafe_retain(input));
 
-        expect_allclose("conv2d_stride2_pad1", actual.unsafe_raw(), expected);
+        typetorch_test::expect_allclose("conv2d_stride2_pad1", actual.unsafe_raw(), expected);
     }
 
     // --- Test 3: to(dtype) F16 ---

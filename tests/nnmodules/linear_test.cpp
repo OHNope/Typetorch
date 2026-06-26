@@ -3,6 +3,8 @@ import libtorch;
 import typetorch;
 import fast_io;
 
+#include "../test_support.inc"
+
 namespace {
 
 using FloatInput = typetorch::Tensor<typetorch::Shape<4, 3>, typetorch::DType::F32,
@@ -10,27 +12,7 @@ using FloatInput = typetorch::Tensor<typetorch::Shape<4, 3>, typetorch::DType::F
 using SingleInput = typetorch::Tensor<typetorch::Shape<2, 4>, typetorch::DType::F32,
                                        typetorch::Device::CPU, typetorch::Layout::Contiguous>;
 
-auto options() -> ::torch::TensorOptions {
-    return ::torch::TensorOptions{}.dtype(::torch::kFloat).device(::torch::kCPU);
-}
 
-void expect_allclose(char const* name, int exit_code, ::torch::Tensor const& actual,
-                     ::torch::Tensor const& expected, double rtol = 1e-4,
-                     double atol = 1e-5) {
-    if (!::torch::allclose(actual, expected, rtol, atol)) {
-        auto actual_f32 = actual.to(::torch::kFloat).reshape({-1});
-        auto expected_f32 = expected.to(::torch::kFloat).reshape({-1});
-        auto diff = actual_f32.sub(expected_f32).abs();
-        auto max_index = diff.argmax().item<::std::int64_t>();
-        ::fast_io::io::perrln(::std::string_view{name}, " mismatch; actual=", actual.toString(),
-                               ", expected=", expected.toString(),
-                               ", max_abs_diff=", diff.max().item<double>(),
-                               ", max_index=", max_index,
-                               ", actual_value=", actual_f32[max_index].item<double>(),
-                               ", expected_value=", expected_f32[max_index].item<double>());
-        ::std::exit(exit_code);
-    }
-}
 
 } // namespace
 
@@ -44,11 +26,11 @@ int main() {
         typed->weight.set_data(raw->weight);
         typed->bias.set_data(raw->bias);
 
-        auto input = ::torch::randn({4, 3}, options());
+        auto input = ::torch::randn({4, 3}, typetorch_test::f32_cpu_options());
         auto expected = raw->forward(input);
         auto actual = typed->forward(FloatInput::unsafe_retain(input));
 
-        expect_allclose("linear_3_to_2_with_bias", 11, actual.unsafe_raw(), expected);
+        typetorch_test::expect_allclose_detailed("linear_3_to_2_with_bias", 11, actual.unsafe_raw(), expected);
     }
 
     // --- Test 2: forward without bias ---
@@ -59,11 +41,11 @@ int main() {
 
         typed->weight.set_data(raw->weight);
 
-        auto input = ::torch::randn({2, 4}, options());
+        auto input = ::torch::randn({2, 4}, typetorch_test::f32_cpu_options());
         auto expected = raw->forward(input);
         auto actual = typed->forward(SingleInput::unsafe_retain(input));
 
-        expect_allclose("linear_4_to_1_no_bias", 12, actual.unsafe_raw(), expected);
+        typetorch_test::expect_allclose_detailed("linear_4_to_1_no_bias", 12, actual.unsafe_raw(), expected);
     }
 
     // --- Test 3: to(dtype) F16 ---
@@ -79,10 +61,10 @@ int main() {
         auto raw_f16_weight = raw->weight.to(::torch::kHalf);
         auto raw_f16_bias = raw->bias.to(::torch::kHalf);
 
-        expect_allclose("linear_to_f16_weight", 13, f16->weight, raw_f16_weight, 0.0, 0.0);
-        expect_allclose("linear_to_f16_bias", 14, f16->bias, raw_f16_bias, 0.0, 0.0);
+        typetorch_test::expect_allclose_detailed("linear_to_f16_weight", 13, f16->weight, raw_f16_weight, 0.0, 0.0);
+        typetorch_test::expect_allclose_detailed("linear_to_f16_bias", 14, f16->bias, raw_f16_bias, 0.0, 0.0);
 
-        auto input = ::torch::randn({4, 3}, options());
+        auto input = ::torch::randn({4, 3}, typetorch_test::f32_cpu_options());
         auto f16_input = input.to(::torch::kHalf);
         auto raw_f16{::torch::nn::Linear{::torch::nn::LinearOptions(3, 2).bias(true)}};
         raw_f16->weight.set_data(raw_f16_weight);
@@ -92,7 +74,7 @@ int main() {
         auto actual_f16 = f16->forward(F16Input::unsafe_retain(f16_input));
         auto actual_f16_f32 = actual_f16.unsafe_raw().to(::torch::kFloat);
         auto expected_f16_f32 = raw_f16->forward(f16_input).to(::torch::kFloat);
-        expect_allclose(
+        typetorch_test::expect_allclose_detailed(
             "linear_to_f16_forward", 15, actual_f16_f32, expected_f16_f32, 1e-3, 1e-3);
     }
 

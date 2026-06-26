@@ -160,14 +160,20 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - suite: core
-            targets: typetorch_cpp_debug typetorch_tensor_arithmetic_test
-          - suite: nnmodules-basic
-            targets: typetorch_nnmodules_linear_test typetorch_nnmodules_conv2d_test typetorch_nnmodules_embedding_test typetorch_nnmodules_pooling_test
+          - suite: core-debug
+            targets: typetorch_cpp_debug
+          - suite: tensor
+            targets: typetorch_tensor_arithmetic_test
+          - suite: nnmodules-linear-conv
+            targets: typetorch_nnmodules_linear_test typetorch_nnmodules_conv2d_test
+          - suite: nnmodules-embedding-pooling
+            targets: typetorch_nnmodules_embedding_test typetorch_nnmodules_pooling_test
           - suite: nnmodules-normalization
             targets: typetorch_nnmodules_layer_norm_test typetorch_nnmodules_rms_norm_test
           - suite: nnmodules-composition
             targets: typetorch_nnmodules_sequential_test typetorch_nnmodules_mlp_test typetorch_nnmodules_wrappers_test
+          - suite: nnmodules-transformer
+            targets: typetorch_nnmodules_transformer_test
     env:
       TEST_TARGETS: ${{ matrix.targets }}
     steps:
@@ -315,6 +321,7 @@ jobs:
             typetorch_nnmodules_mlp_test
             typetorch_nnmodules_wrappers_test
             typetorch_nnmodules_pooling_test
+            typetorch_nnmodules_transformer_test
           )
           for target in "${test_targets[@]}"; do
             xmake build -j "$BUILD_JOBS" "$target"

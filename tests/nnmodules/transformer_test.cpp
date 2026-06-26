@@ -3,6 +3,8 @@ import libtorch;
 import typetorch;
 import fast_io;
 
+#include "../test_support.inc"
+
 namespace
 {
 
@@ -20,15 +22,7 @@ using Logits = typetorch::Tensor<typetorch::Shape<2, 3, 11>,
                                  typetorch::Device::CPU,
                                  typetorch::Layout::Any>;
 
-auto float_options() -> ::torch::TensorOptions
-{
-    return ::torch::TensorOptions{}.dtype(::torch::kFloat).device(::torch::kCPU);
-}
 
-auto index_options() -> ::torch::TensorOptions
-{
-    return ::torch::TensorOptions{}.dtype(::torch::kLong).device(::torch::kCPU);
-}
 
 } // namespace
 
@@ -46,22 +40,14 @@ int main()
                   Logits>);
 
     Attention attention;
-    auto hidden{::torch::randn({2, 3, 8}, float_options())};
+    auto hidden{::torch::randn({2, 3, 8}, typetorch_test::f32_cpu_options())};
     auto attended{attention->forward(Hidden::unsafe_retain(hidden))};
-    if (attended.unsafe_raw().size(0) != 2 || attended.unsafe_raw().size(1) != 3 || attended.unsafe_raw().size(2) != 8)
-    {
-        ::fast_io::io::perrln("CausalSelfAttention shape mismatch");
-        ::std::exit(1);
-    }
+    typetorch_test::expect_shape<2, 3, 8>("CausalSelfAttention", attended.unsafe_raw());
 
     Transformer transformer;
-    auto tokens{::torch::rand({2, 3}, float_options()).mul(11).to(index_options())};
+    auto tokens{::torch::rand({2, 3}, typetorch_test::f32_cpu_options()).mul(11).to(typetorch_test::i64_cpu_options())};
     auto logits{transformer->forward(Tokens::unsafe_retain(tokens))};
-    if (logits.unsafe_raw().size(0) != 2 || logits.unsafe_raw().size(1) != 3 || logits.unsafe_raw().size(2) != 11)
-    {
-        ::fast_io::io::perrln("TypedTransformer logits shape mismatch");
-        ::std::exit(1);
-    }
+    typetorch_test::expect_shape<2, 3, 11>("TypedTransformer logits", logits.unsafe_raw());
 
     ::fast_io::io::println("typetorch Transformer tests passed");
 }

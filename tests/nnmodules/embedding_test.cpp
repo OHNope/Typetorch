@@ -3,6 +3,8 @@ import libtorch;
 import typetorch;
 import fast_io;
 
+#include "../test_support.inc"
+
 namespace {
 
 using Indices1D = typetorch::Tensor<typetorch::Shape<4>, typetorch::DType::I64,
@@ -10,14 +12,6 @@ using Indices1D = typetorch::Tensor<typetorch::Shape<4>, typetorch::DType::I64,
 using Indices2D = typetorch::Tensor<typetorch::Shape<2, 3>, typetorch::DType::I64,
                                      typetorch::Device::CPU, typetorch::Layout::Contiguous>;
 
-void expect_allclose(char const* name, ::torch::Tensor const& actual,
-                     ::torch::Tensor const& expected) {
-    if (!::torch::allclose(actual, expected)) {
-        ::fast_io::io::perrln(name, " mismatch; actual=", actual.toString(),
-                               ", expected=", expected.toString());
-        ::std::exit(1);
-    }
-}
 
 } // namespace
 
@@ -36,7 +30,7 @@ int main() {
         auto expected = raw.forward(indices);
         auto actual = typed->forward(Indices1D::unsafe_retain(indices));
 
-        expect_allclose("embedding_1d", actual.unsafe_raw(), expected);
+        typetorch_test::expect_allclose("embedding_1d", actual.unsafe_raw(), expected);
     }
 
     // --- Test 2: forward with 2D indices ---
@@ -52,7 +46,7 @@ int main() {
         auto expected = raw.forward(indices);
         auto actual = typed->forward(Indices2D::unsafe_retain(indices));
 
-        expect_allclose("embedding_2d", actual.unsafe_raw(), expected);
+        typetorch_test::expect_allclose("embedding_2d", actual.unsafe_raw(), expected);
     }
 
     // --- Test 3: to(dtype) F16 ---

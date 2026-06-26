@@ -46,12 +46,8 @@ inline auto register_all_modules(auto &self) -> void
 			}
 			else if constexpr (is_template_spec_of(member_type, ^^::std::tuple))
 			{
-				if constexpr (requires { self.layer_count; })
-				{
-					static_assert(false, "should provide layer count in the class in order to registere the tuple member!");
-				};
 				template for (constexpr ::std::size_t I :
-							  ::std::views::iota(::std::size_t{}, self.layer_count))
+							  ::std::views::iota(::std::size_t{}, std::meta::template_arguments_of(member_type).size()))
 				{
 					self.register_module(::std::to_string(I),
 										 ::std::get<I>(self.[:member:]));

@@ -43,7 +43,7 @@ struct CausalSelfAttentionImpl : ::torch::nn::Module
 	CausalSelfAttentionImpl()
 		: query{}, key{}, value{}, output{}
 	{
-		register_all_modules(*this);
+		register_modules();
 	}
 
 	CausalSelfAttentionImpl(Projection query, Projection key, Projection value,
@@ -51,7 +51,7 @@ struct CausalSelfAttentionImpl : ::torch::nn::Module
 		: query{::std::move(query)}, key{::std::move(key)},
 		  value{::std::move(value)}, output{::std::move(output)}
 	{
-		register_all_modules(*this);
+		register_modules();
 	}
 
 	template <TensorLike Input>
@@ -149,6 +149,14 @@ struct CausalSelfAttentionImpl : ::torch::nn::Module
 	static constexpr Device device_kind{device};
 
 private:
+	void register_modules()
+	{
+		this->register_module("query", query);
+		this->register_module("key", key);
+		this->register_module("value", value);
+		this->register_module("output", output);
+	}
+
 	Projection query;
 	Projection key;
 	Projection value;
@@ -208,7 +216,7 @@ struct TransformerBlockImpl : ::torch::nn::Module
 	TransformerBlockImpl()
 		: attention{}, norm1{}, norm2{}, feed_forward{}
 	{
-		register_all_modules(*this);
+		register_modules();
 	}
 
 	TransformerBlockImpl(Attention attention, Norm norm1, Norm norm2,
@@ -216,7 +224,7 @@ struct TransformerBlockImpl : ::torch::nn::Module
 		: attention{::std::move(attention)}, norm1{::std::move(norm1)},
 		  norm2{::std::move(norm2)}, feed_forward{::std::move(feed_forward)}
 	{
-		register_all_modules(*this);
+		register_modules();
 	}
 
 	template <TensorLike Input>
@@ -260,6 +268,14 @@ struct TransformerBlockImpl : ::torch::nn::Module
 	}
 
 private:
+	void register_modules()
+	{
+		this->register_module("attention", attention);
+		this->register_module("norm1", norm1);
+		this->register_module("norm2", norm2);
+		this->register_module("feed_forward", feed_forward);
+	}
+
 	Attention attention;
 	Norm norm1;
 	Norm norm2;
@@ -327,7 +343,7 @@ struct TypedTransformerImpl : ::torch::nn::Module
 		{
 			blocks.emplace_back();
 		}
-		register_all_modules(*this);
+		register_modules();
 	}
 
 	template <TensorLike Indices>
@@ -386,6 +402,18 @@ struct TypedTransformerImpl : ::torch::nn::Module
 	static constexpr ::std::size_t layer_count{Layers};
 
 private:
+	void register_modules()
+	{
+		this->register_module("token_embedding", token_embedding);
+		this->register_module("position_embedding", position_embedding);
+		for (::std::size_t i{}; i < blocks.size(); ++i)
+		{
+			this->register_module("block_" + ::std::to_string(i), blocks[i]);
+		}
+		this->register_module("norm", norm);
+		this->register_module("lm_head", lm_head);
+	}
+
 	TokenEmbedding token_embedding;
 	PositionEmbedding position_embedding;
 	::std::vector<Block> blocks;

@@ -3,14 +3,13 @@ import libtorch;
 import typetorch;
 import fast_io;
 
+#include "../test_support.inc"
+
 namespace {
 
 using Input = typetorch::Tensor<typetorch::Shape<2, 3>, typetorch::DType::F32,
                                  typetorch::Device::CPU, typetorch::Layout::Contiguous>;
 
-auto options() -> ::torch::TensorOptions {
-    return ::torch::TensorOptions{}.dtype(::torch::kFloat).device(::torch::kCPU);
-}
 
 } // namespace
 
@@ -22,11 +21,11 @@ int main() {
             ::torch::nn::Linear(::torch::nn::LinearOptions(3, 5).bias(true)),
             ::torch::nn::Linear(::torch::nn::LinearOptions(5, 2).bias(false)));
         raw[0]->as<::torch::nn::Linear>()->weight.set_data(
-            ::torch::randn({5, 3}, options()));
+            ::torch::randn({5, 3}, typetorch_test::f32_cpu_options()));
         raw[0]->as<::torch::nn::Linear>()->bias.set_data(
-            ::torch::randn({5}, options()));
+            ::torch::randn({5}, typetorch_test::f32_cpu_options()));
         raw[1]->as<::torch::nn::Linear>()->weight.set_data(
-            ::torch::randn({2, 5}, options()));
+            ::torch::randn({2, 5}, typetorch_test::f32_cpu_options()));
 
         // Typed equivalent
         using LinearA = typetorch::Linear<3, 5>;
@@ -39,7 +38,7 @@ int main() {
 
         auto seq = typetorch::Sequential(a, b);
 
-        auto input = ::torch::randn({2, 3}, options());
+        auto input = ::torch::randn({2, 3}, typetorch_test::f32_cpu_options());
         auto expected = raw->forward(input);
         auto actual = seq->forward(Input::unsafe_retain(input));
 
@@ -80,11 +79,11 @@ int main() {
             ::torch::nn::Linear(::torch::nn::LinearOptions(3, 3).bias(false)),
             ::torch::nn::LayerNorm(::torch::nn::LayerNormOptions({3})));
         raw[0]->as<::torch::nn::Linear>()->weight.set_data(
-            ::torch::randn({3, 3}, options()));
+            ::torch::randn({3, 3}, typetorch_test::f32_cpu_options()));
         raw[1]->as<::torch::nn::LayerNorm>()->weight.set_data(
-            ::torch::ones({3}, options()));
+            ::torch::ones({3}, typetorch_test::f32_cpu_options()));
         raw[1]->as<::torch::nn::LayerNorm>()->bias.set_data(
-            ::torch::zeros({3}, options()));
+            ::torch::zeros({3}, typetorch_test::f32_cpu_options()));
 
         using L = typetorch::Linear<3, 3>;
         using LN = typetorch::LayerNorm<typetorch::Shape<3>>;
@@ -96,7 +95,7 @@ int main() {
 
         auto seq = typetorch::Sequential(lin, ln);
 
-        auto input = ::torch::randn({2, 3}, options());
+        auto input = ::torch::randn({2, 3}, typetorch_test::f32_cpu_options());
         auto expected = raw->forward(input);
         auto actual = seq->forward(Input::unsafe_retain(input));
 

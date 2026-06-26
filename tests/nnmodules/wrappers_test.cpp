@@ -3,6 +3,8 @@ import libtorch;
 import typetorch;
 import fast_io;
 
+#include "../test_support.inc"
+
 namespace
 {
 
@@ -18,12 +20,6 @@ using FlattenOutput =
 using Sequence =
 	typetorch::Sequential<typetorch::ReLU, typetorch::Flatten<1, -1>>;
 
-auto options() -> ::torch::TensorOptions
-{
-	return ::torch::TensorOptions{}
-		.dtype(::torch::kFloat)
-		.device(::torch::kCPU);
-}
 
 } // namespace
 
@@ -45,7 +41,7 @@ int main()
 	static_assert(typetorch::Flatten<1, -1>::start_dim == 1);
 	static_assert(typetorch::Flatten<1, -1>::end_dim == -1);
 
-	auto raw{::torch::randn({2, 3, 4, 5}, options())};
+	auto raw{::torch::randn({2, 3, 4, 5}, typetorch_test::f32_cpu_options())};
 	auto sequence{
 		typetorch::Sequential{typetorch::ReLU{},
 							 typetorch::Flatten<1, -1>{}}};

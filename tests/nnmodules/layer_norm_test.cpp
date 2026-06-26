@@ -3,6 +3,8 @@ import libtorch;
 import typetorch;
 import fast_io;
 
+#include "../test_support.inc"
+
 namespace {
 
 using Input23 = typetorch::Tensor<typetorch::Shape<2, 3>, typetorch::DType::F32,
@@ -10,18 +12,7 @@ using Input23 = typetorch::Tensor<typetorch::Shape<2, 3>, typetorch::DType::F32,
 using Input224 = typetorch::Tensor<typetorch::Shape<2, 2, 4>, typetorch::DType::F32,
                                     typetorch::Device::CPU, typetorch::Layout::Contiguous>;
 
-auto options() -> ::torch::TensorOptions {
-    return ::torch::TensorOptions{}.dtype(::torch::kFloat).device(::torch::kCPU);
-}
 
-void expect_allclose(char const* name, ::torch::Tensor const& actual,
-                     ::torch::Tensor const& expected) {
-    if (!::torch::allclose(actual, expected)) {
-        ::fast_io::io::perrln(name, " mismatch; actual=", actual.toString(),
-                               ", expected=", expected.toString());
-        ::std::exit(1);
-    }
-}
 
 } // namespace
 
@@ -36,7 +27,7 @@ int main() {
         typed->weight.set_data(raw->weight);
         typed->bias.set_data(raw->bias);
 
-        auto input = ::torch::randn({2, 3}, options());
+        auto input = ::torch::randn({2, 3}, typetorch_test::f32_cpu_options());
         auto expected = raw->forward(input);
         auto actual = typed->forward(Input23::unsafe_retain(input));
 
@@ -53,7 +44,7 @@ int main() {
         using LN = typetorch::LayerNorm<typetorch::Shape<4>>;
         LN typed(/*eps=*/1e-5, /*elementwise_affine=*/false);
 
-        auto input = ::torch::randn({2, 2, 4}, options());
+        auto input = ::torch::randn({2, 2, 4}, typetorch_test::f32_cpu_options());
         auto expected = raw->forward(input);
         auto actual = typed->forward(Input224::unsafe_retain(input));
 

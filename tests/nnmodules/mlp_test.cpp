@@ -3,6 +3,8 @@ import libtorch;
 import typetorch;
 import fast_io;
 
+#include "../test_support.inc"
+
 namespace
 {
 
@@ -15,12 +17,6 @@ using Output =
 	typetorch::Tensor<typetorch::Shape<7, 2>, typetorch::DType::F32,
 					  typetorch::Device::CPU, typetorch::Layout::Any>;
 
-inline auto options() -> ::torch::TensorOptions
-{
-	return ::torch::TensorOptions{}
-		.dtype(::torch::kFloat)
-		.device(::torch::kCPU);
-}
 
 } // namespace
 
@@ -57,7 +53,7 @@ int main()
 	typed.template get<2>()->weight.set_data(raw2->weight);
 	typed.template get<2>()->bias.set_data(raw2->bias);
 
-	auto input{::torch::randn({7, 3}, options())};
+	auto input{::torch::randn({7, 3}, typetorch_test::f32_cpu_options())};
 	auto expected{
 		raw2->forward(::torch::relu(raw1->forward(
 			::torch::relu(raw0->forward(input)))))};

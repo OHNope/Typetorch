@@ -3,6 +3,8 @@ import libtorch;
 import typetorch;
 import fast_io;
 
+#include "../test_support.inc"
+
 namespace
 {
 
@@ -27,22 +29,7 @@ using AdaptiveKeepHeightOutput =
 					  typetorch::DType::F32, typetorch::Device::CPU,
 					  typetorch::Layout::Any>;
 
-auto options() -> ::torch::TensorOptions
-{
-	return ::torch::TensorOptions{}
-		.dtype(::torch::kFloat)
-		.device(::torch::kCPU);
-}
 
-void expect_allclose(char const *name, ::torch::Tensor const &actual,
-					 ::torch::Tensor const &expected)
-{
-	if (!::torch::allclose(actual, expected))
-	{
-		::fast_io::io::perrln(name, " mismatch");
-        ::std::exit(1);
-	}
-}
 
 } // namespace
 
@@ -77,7 +64,7 @@ int main()
 							   .forward(::std::declval<Input const &>())),
 				  AdaptiveKeepHeightOutput>);
 
-	auto input{::torch::randn({2, 3, 9, 10}, options())};
+	auto input{::torch::randn({2, 3, 9, 10}, typetorch_test::f32_cpu_options())};
 
 	Max max_pool;
 	auto raw_max{::torch::nn::MaxPool2d{
@@ -86,7 +73,7 @@ int main()
 			.padding({1, 0})
 			.dilation({1, 1})
 			.ceil_mode(true)}};
-	expect_allclose(
+	typetorch_test::expect_allclose(
 		"MaxPool2d",
 		max_pool->forward(Input::unsafe_retain(input)).unsafe_raw(),
 		raw_max->forward(input));
@@ -98,7 +85,7 @@ int main()
 			.padding({0, 0})
 			.ceil_mode(false)
 			.count_include_pad(false)}};
-	expect_allclose(
+	typetorch_test::expect_allclose(
 		"AvgPool2d",
 		avg_pool->forward(Input::unsafe_retain(input)).unsafe_raw(),
 		raw_avg->forward(input));
@@ -106,14 +93,14 @@ int main()
 	Adaptive adaptive_pool;
 	auto raw_adaptive{::torch::adaptive_avg_pool2d(
 		input, ::std::array<::std::int64_t, 2>{2, 3})};
-	expect_allclose(
+	typetorch_test::expect_allclose(
 		"AdaptiveAvgPool2d",
 		adaptive_pool->forward(Input::unsafe_retain(input)).unsafe_raw(),
 		raw_adaptive);
 	AdaptiveKeepHeight adaptive_keep_height;
 	auto raw_adaptive_keep_height{::torch::adaptive_avg_pool2d(
 		input, ::std::array<::std::int64_t, 2>{9, 3})};
-	expect_allclose(
+	typetorch_test::expect_allclose(
 		"AdaptiveAvgPool2d keep height",
 		adaptive_keep_height->forward(Input::unsafe_retain(input)).unsafe_raw(),
 		raw_adaptive_keep_height);
