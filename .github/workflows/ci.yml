@@ -229,6 +229,7 @@ jobs:
       - name: Build C++ test targets
         run: |
           source scripts/env.sh
+          xmake build -j "$BUILD_JOBS" typetorch_sdk
           for target in $TEST_TARGETS; do
             xmake build -j "$BUILD_JOBS" "$target"
           done
@@ -302,6 +303,7 @@ jobs:
       - name: Build and run coverage tests
         run: |
           source scripts/env.sh
+          xmake build -j "$BUILD_JOBS" typetorch_sdk
           test_targets=(
             typetorch_tensor_arithmetic_test
             typetorch_nnmodules_linear_test
@@ -486,6 +488,7 @@ jobs:
       - name: Build size probe
         run: |
           source scripts/env.sh
+          xmake build -j "$BUILD_JOBS" typetorch_sdk
           xmake build -j "$BUILD_JOBS" "$PROBE_TARGET"
 
       - name: Inspect size probe
