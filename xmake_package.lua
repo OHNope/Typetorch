@@ -33,6 +33,10 @@ local typetorch_module_files = {
     "src/typetorch/nnModules/layer_norm.mpp",
     "src/typetorch/nnModules/rms_norm.mpp",
     "src/typetorch/nnModules/sequential.mpp",
+    "src/typetorch/nnModules/mlp.mpp",
+    "src/typetorch/nnModules/activation.mpp",
+    "src/typetorch/nnModules/flatten.mpp",
+    "src/typetorch/nnModules/pooling.mpp",
     "src/typetorch/nnModules/nnModules.mpp",
     "src/typetorch/typetorch.mpp",
 }

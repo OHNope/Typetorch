@@ -30,7 +30,7 @@ jobs:
       run: ${{ steps.changes.outputs.run }}
     steps:
       - name: Check out repository history
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -83,7 +83,7 @@ jobs:
     timeout-minutes: 120
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: recursive
 
@@ -97,7 +97,7 @@ jobs:
 
       - name: Restore xmake installation
         id: xmake-install-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.local/bin/xmake
@@ -118,7 +118,7 @@ jobs:
 
       - name: Save xmake installation
         if: steps.xmake-install-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: |
             ~/.local/bin/xmake
@@ -128,7 +128,7 @@ jobs:
 
       - name: Restore xmake packages
         id: xmake-package-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: ~/.xmake/packages
           key: ${{ runner.os }}-gcc16-xmake-packages-cpu-${{ hashFiles('xmake.lua', 'xmake_package.lua', 'packages/**/xmake.lua') }}
@@ -143,7 +143,7 @@ jobs:
 
       - name: Save xmake packages
         if: steps.xmake-package-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: ~/.xmake/packages
           key: ${{ steps.xmake-package-cache.outputs.cache-primary-key }}
@@ -158,7 +158,7 @@ jobs:
     timeout-minutes: 120
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: recursive
 
@@ -171,7 +171,7 @@ jobs:
           rm -rf /var/lib/apt/lists/*
 
       - name: Restore xmake installation
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.local/bin/xmake
@@ -182,7 +182,7 @@ jobs:
             ${{ runner.os }}-gcc16-xmake-install-
 
       - name: Restore xmake packages
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: ~/.xmake/packages
           key: ${{ runner.os }}-gcc16-xmake-packages-cpu-${{ hashFiles('xmake.lua', 'xmake_package.lua', 'packages/**/xmake.lua') }}
@@ -234,7 +234,7 @@ jobs:
     timeout-minutes: 120
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: recursive
 
@@ -247,7 +247,7 @@ jobs:
           rm -rf /var/lib/apt/lists/*
 
       - name: Restore xmake installation
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.local/bin/xmake
@@ -258,7 +258,7 @@ jobs:
             ${{ runner.os }}-gcc16-xmake-install-
 
       - name: Restore xmake packages
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: ~/.xmake/packages
           key: ${{ runner.os }}-gcc16-xmake-packages-cpu-${{ hashFiles('xmake.lua', 'xmake_package.lua', 'packages/**/xmake.lua') }}
@@ -298,7 +298,7 @@ jobs:
     timeout-minutes: 120
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: recursive
 
@@ -311,7 +311,7 @@ jobs:
           rm -rf /var/lib/apt/lists/*
 
       - name: Restore xmake installation
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.local/bin/xmake
@@ -322,7 +322,7 @@ jobs:
             ${{ runner.os }}-gcc16-xmake-install-
 
       - name: Restore xmake packages
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: ~/.xmake/packages
           key: ${{ runner.os }}-gcc16-xmake-packages-cpu-${{ hashFiles('xmake.lua', 'xmake_package.lua', 'packages/**/xmake.lua') }}
@@ -362,7 +362,7 @@ jobs:
     timeout-minutes: 120
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: recursive
 
@@ -373,7 +373,7 @@ jobs:
           rm -rf /var/lib/apt/lists/*
 
       - name: Restore xmake installation
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.local/bin/xmake
@@ -384,7 +384,7 @@ jobs:
             ${{ runner.os }}-gcc16-xmake-install-
 
       - name: Restore xmake packages
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: ~/.xmake/packages
           key: ${{ runner.os }}-gcc16-xmake-packages-cpu-${{ hashFiles('xmake.lua', 'xmake_package.lua', 'packages/**/xmake.lua') }}

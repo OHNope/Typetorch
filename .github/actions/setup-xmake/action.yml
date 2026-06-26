@@ -43,7 +43,7 @@ runs:
 
     - name: Restore xmake installation
       id: xmake-install-cache
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: |
           ~/.local/bin/xmake
@@ -56,7 +56,7 @@ runs:
     - name: Restore xmake packages
       id: xmake-package-cache
       if: inputs.cache-packages == 'true'
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: |
           ~/.xmake/packages
@@ -77,7 +77,7 @@ runs:
 
     - name: Save xmake installation
       if: steps.xmake-install-cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v5
       continue-on-error: true
       with:
         path: |
@@ -109,7 +109,7 @@ runs:
 
     - name: Save xmake packages
       if: inputs.cache-packages == 'true' && steps.xmake-package-cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v5
       continue-on-error: true
       with:
         path: |
