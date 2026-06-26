@@ -1,0 +1,425 @@
+export module typetorch:nnModules_transformer;
+
+import std;
+import libtorch;
+import :types;
+import :common;
+import :tensor;
+import :nnModules_core;
+import :nnModules_linear;
+import :nnModules_embedding;
+import :nnModules_layer_norm;
+import :nnModules_mlp;
+
+#include "attributes.inc"
+
+export namespace typetorch
+{
+
+namespace detail
+{
+
+template <::std::int64_t Batch, ::std::int64_t SeqLen,
+		  ::std::int64_t EmbedDim, ::std::int64_t Heads,
+		  DType dtype = DType::F32, Device device = Device::CPU>
+struct CausalSelfAttentionImpl : ::torch::nn::Module
+{
+	static_assert(Batch > 0, "CausalSelfAttention batch must be positive");
+	static_assert(SeqLen > 0, "CausalSelfAttention sequence length must be positive");
+	static_assert(EmbedDim > 0, "CausalSelfAttention embed dim must be positive");
+	static_assert(Heads > 0, "CausalSelfAttention heads must be positive");
+	static_assert(EmbedDim % Heads == 0,
+				  "CausalSelfAttention embed dim must be divisible by heads");
+	static_assert(dtype != DType::Any,
+				  "CausalSelfAttention parameters require a concrete dtype");
+	static_assert(device != Device::Any,
+				  "CausalSelfAttention parameters require a concrete device");
+	static_assert(::typetorch::detail::is_floating_dtype(dtype),
+				  "CausalSelfAttention parameters require a floating dtype");
+
+	static constexpr ::std::int64_t head_dim{EmbedDim / Heads};
+	using Projection = Linear<EmbedDim, EmbedDim, dtype, device>;
+
+	CausalSelfAttentionImpl()
+		: query{}, key{}, value{}, output{}
+	{
+		register_all_modules(*this);
+	}
+
+	CausalSelfAttentionImpl(Projection query, Projection key, Projection value,
+							Projection output)
+		: query{::std::move(query)}, key{::std::move(key)},
+		  value{::std::move(value)}, output{::std::move(output)}
+	{
+		register_all_modules(*this);
+	}
+
+	template <TensorLike Input>
+	[[nodiscard]] TYPETORCH_HOT inline auto forward(Input const &input)
+	{
+		using InputShape = typename Input::shape;
+		static_assert(InputShape::rank == 3,
+					  "CausalSelfAttention input must have shape [B, T, C]");
+		static_assert(InputShape::dims[0] == Batch &&
+						  InputShape::dims[1] == SeqLen &&
+						  InputShape::dims[2] == EmbedDim,
+					  "CausalSelfAttention input shape must match template parameters");
+		static_assert(Input::dtype == DType::Any ||
+						  ::typetorch::detail::is_floating_dtype(Input::dtype),
+					  "CausalSelfAttention input requires floating tensor dtype");
+
+		using Result = Tensor<Shape<Batch, SeqLen, EmbedDim>,
+							  common_dtype(Input::dtype, dtype),
+							  common_device(Input::device, device), Layout::Any>;
+
+		auto q{query->forward(input)};
+		auto k{key->forward(input)};
+		auto v{value->forward(input)};
+
+		auto q_raw{q.unsafe_raw()
+					   .view({Batch, SeqLen, Heads, head_dim})
+					   .transpose(1, 2)};
+		auto k_raw{k.unsafe_raw()
+					   .view({Batch, SeqLen, Heads, head_dim})
+					   .transpose(1, 2)};
+		auto v_raw{v.unsafe_raw()
+					   .view({Batch, SeqLen, Heads, head_dim})
+					   .transpose(1, 2)};
+
+		auto scores{q_raw.matmul(k_raw.transpose(-2, -1))
+						.div(::std::sqrt(static_cast<double>(head_dim)))};
+		auto mask{::torch::ones({SeqLen, SeqLen},
+								::torch::TensorOptions{}
+									.dtype(::torch::kBool)
+									.device(scores.device()))
+					  .tril()
+					  .logical_not()
+					  .view({1, 1, SeqLen, SeqLen})};
+		scores = scores.masked_fill(
+			mask, -::std::numeric_limits<float>::infinity());
+		auto weights{scores.softmax(-1)};
+		auto context{weights.matmul(v_raw)
+						 .transpose(1, 2)
+						 .contiguous()
+						 .view({Batch, SeqLen, EmbedDim})};
+		return output->forward(Result::unsafe_move(::std::move(context)));
+	}
+
+	template <Device ndevice, DType ndtype = dtype>
+	[[nodiscard]] inline auto to() const
+	{
+		using ResultImpl =
+			CausalSelfAttentionImpl<Batch, SeqLen, EmbedDim, Heads, ndtype,
+									ndevice>;
+		return ::std::make_shared<ResultImpl>(
+			query.template to<ndevice, ndtype>(),
+			key.template to<ndevice, ndtype>(),
+			value.template to<ndevice, ndtype>(),
+			output.template to<ndevice, ndtype>());
+	}
+
+	template <DType ndtype>
+	[[nodiscard]] inline auto to() const
+	{
+		return to<device, ndtype>();
+	}
+
+	[[nodiscard]] inline auto get_query() noexcept -> Projection &
+	{
+		return query;
+	}
+	[[nodiscard]] inline auto get_key() noexcept -> Projection &
+	{
+		return key;
+	}
+	[[nodiscard]] inline auto get_value() noexcept -> Projection &
+	{
+		return value;
+	}
+	[[nodiscard]] inline auto get_output() noexcept -> Projection &
+	{
+		return output;
+	}
+
+	static constexpr ::std::int64_t batch{Batch};
+	static constexpr ::std::int64_t sequence_length{SeqLen};
+	static constexpr ::std::int64_t embed_dim{EmbedDim};
+	static constexpr ::std::int64_t heads{Heads};
+	static constexpr DType dtype_kind{dtype};
+	static constexpr Device device_kind{device};
+
+private:
+	Projection query;
+	Projection key;
+	Projection value;
+	Projection output;
+};
+
+} // namespace detail
+
+template <::std::int64_t Batch, ::std::int64_t SeqLen,
+		  ::std::int64_t EmbedDim, ::std::int64_t Heads,
+		  DType dtype = DType::F32, Device device = Device::CPU>
+class CausalSelfAttention
+	: public ::torch::nn::ModuleHolder<
+		  detail::CausalSelfAttentionImpl<Batch, SeqLen, EmbedDim, Heads,
+										  dtype, device>>
+{
+public:
+	using Impl = detail::CausalSelfAttentionImpl<Batch, SeqLen, EmbedDim,
+												 Heads, dtype, device>;
+	using Base = ::torch::nn::ModuleHolder<Impl>;
+	using Base::Base;
+
+	template <Device ndevice, DType ndtype = dtype>
+	[[nodiscard]] inline auto to() const
+	{
+		return CausalSelfAttention<Batch, SeqLen, EmbedDim, Heads, ndtype,
+								   ndevice>{
+			this->ptr()->template to<ndevice, ndtype>()};
+	}
+
+	template <DType ndtype>
+	[[nodiscard]] inline auto to() const
+	{
+		return to<device, ndtype>();
+	}
+
+	static constexpr ::std::int64_t head_dim{Impl::head_dim};
+};
+
+namespace detail
+{
+
+template <::std::int64_t Batch, ::std::int64_t SeqLen,
+		  ::std::int64_t EmbedDim, ::std::int64_t Heads,
+		  ::std::int64_t MLPHidden, DType dtype = DType::F32,
+		  Device device = Device::CPU>
+struct TransformerBlockImpl : ::torch::nn::Module
+{
+	static_assert(MLPHidden > 0, "TransformerBlock MLP hidden dim must be positive");
+
+	using Attention = CausalSelfAttention<Batch, SeqLen, EmbedDim, Heads,
+										  dtype, device>;
+	using Norm = LayerNorm<Shape<EmbedDim>, dtype, device>;
+	using FeedForward = TypedMLP<Shape<EmbedDim, MLPHidden, EmbedDim>, dtype,
+								 device>;
+
+	TransformerBlockImpl()
+		: attention{}, norm1{}, norm2{}, feed_forward{}
+	{
+		register_all_modules(*this);
+	}
+
+	TransformerBlockImpl(Attention attention, Norm norm1, Norm norm2,
+						 FeedForward feed_forward)
+		: attention{::std::move(attention)}, norm1{::std::move(norm1)},
+		  norm2{::std::move(norm2)}, feed_forward{::std::move(feed_forward)}
+	{
+		register_all_modules(*this);
+	}
+
+	template <TensorLike Input>
+	[[nodiscard]] TYPETORCH_HOT inline auto forward(Input const &input)
+	{
+		auto attention_input{norm1->forward(input)};
+		auto attention_output{attention->forward(attention_input)};
+		auto residual{input.add(attention_output)};
+		auto ff_input{norm2->forward(residual)};
+		auto ff_output{feed_forward->forward(ff_input)};
+		return residual.add(ff_output);
+	}
+
+	template <Device ndevice, DType ndtype = dtype>
+	[[nodiscard]] inline auto to() const
+	{
+		using ResultImpl = TransformerBlockImpl<Batch, SeqLen, EmbedDim,
+												Heads, MLPHidden, ndtype,
+												ndevice>;
+		return ::std::make_shared<ResultImpl>(
+			attention.template to<ndevice, ndtype>(),
+			norm1.template to<ndevice, ndtype>(),
+			norm2.template to<ndevice, ndtype>(),
+			feed_forward.template to<ndevice, ndtype>());
+	}
+
+	template <DType ndtype>
+	[[nodiscard]] inline auto to() const
+	{
+		return to<device, ndtype>();
+	}
+
+	[[nodiscard]] inline auto get_attention() noexcept -> Attention &
+	{
+		return attention;
+	}
+
+	[[nodiscard]] inline auto get_feed_forward() noexcept -> FeedForward &
+	{
+		return feed_forward;
+	}
+
+private:
+	Attention attention;
+	Norm norm1;
+	Norm norm2;
+	FeedForward feed_forward;
+};
+
+} // namespace detail
+
+template <::std::int64_t Batch, ::std::int64_t SeqLen,
+		  ::std::int64_t EmbedDim, ::std::int64_t Heads,
+		  ::std::int64_t MLPHidden, DType dtype = DType::F32,
+		  Device device = Device::CPU>
+class TransformerBlock
+	: public ::torch::nn::ModuleHolder<
+		  detail::TransformerBlockImpl<Batch, SeqLen, EmbedDim, Heads,
+									   MLPHidden, dtype, device>>
+{
+public:
+	using Impl = detail::TransformerBlockImpl<Batch, SeqLen, EmbedDim,
+											  Heads, MLPHidden, dtype, device>;
+	using Base = ::torch::nn::ModuleHolder<Impl>;
+	using Base::Base;
+
+	template <Device ndevice, DType ndtype = dtype>
+	[[nodiscard]] inline auto to() const
+	{
+		return TransformerBlock<Batch, SeqLen, EmbedDim, Heads, MLPHidden,
+								ndtype, ndevice>{
+			this->ptr()->template to<ndevice, ndtype>()};
+	}
+
+	template <DType ndtype>
+	[[nodiscard]] inline auto to() const
+	{
+		return to<device, ndtype>();
+	}
+};
+
+namespace detail
+{
+
+template <::std::int64_t Batch, ::std::int64_t SeqLen,
+		  ::std::int64_t VocabSize, ::std::int64_t EmbedDim,
+		  ::std::int64_t Heads, ::std::int64_t MLPHidden,
+		  ::std::size_t Layers, DType dtype = DType::F32,
+		  Device device = Device::CPU>
+struct TypedTransformerImpl : ::torch::nn::Module
+{
+	static_assert(VocabSize > 0, "TypedTransformer vocab size must be positive");
+	static_assert(Layers > 0, "TypedTransformer requires at least one block");
+
+	using TokenEmbedding = Embedding<VocabSize, EmbedDim, dtype, device>;
+	using PositionEmbedding = Embedding<SeqLen, EmbedDim, dtype, device>;
+	using Block = TransformerBlock<Batch, SeqLen, EmbedDim, Heads, MLPHidden,
+								   dtype, device>;
+	using FinalNorm = LayerNorm<Shape<EmbedDim>, dtype, device>;
+	using LMHead = Linear<EmbedDim, VocabSize, dtype, device>;
+
+	TypedTransformerImpl()
+		: token_embedding{}, position_embedding{}, blocks{}, norm{},
+		  lm_head{false}
+	{
+		blocks.reserve(Layers);
+		for (::std::size_t i{}; i < Layers; ++i)
+		{
+			blocks.emplace_back();
+		}
+		register_all_modules(*this);
+	}
+
+	template <TensorLike Indices>
+	[[nodiscard]] TYPETORCH_HOT inline auto forward(Indices const &indices)
+	{
+		using IndexShape = typename Indices::shape;
+		static_assert(IndexShape::rank == 2,
+					  "TypedTransformer input must have shape [B, T]");
+		static_assert(IndexShape::dims[0] == Batch &&
+						  IndexShape::dims[1] == SeqLen,
+					  "TypedTransformer input shape must match template parameters");
+		static_assert(Indices::dtype == DType::Any || Indices::dtype == DType::I64,
+					  "TypedTransformer input indices must be int64 tensors");
+
+		using PositionIds = Tensor<Shape<SeqLen>, DType::I64, device>;
+		auto positions{PositionIds::template arange<SeqLen, DType::I64, device>()};
+		auto token_embeddings{token_embedding->forward(indices)};
+		auto position_embeddings{position_embedding->forward(positions)};
+		auto output{token_embeddings.add(position_embeddings)};
+
+		for (auto &block : blocks)
+		{
+			output = block->forward(output);
+		}
+
+		auto normalized{norm->forward(output)};
+		return lm_head->forward(normalized);
+	}
+
+	[[nodiscard]] inline auto get_token_embedding() noexcept -> TokenEmbedding &
+	{
+		return token_embedding;
+	}
+
+	[[nodiscard]] inline auto get_position_embedding() noexcept -> PositionEmbedding &
+	{
+		return position_embedding;
+	}
+
+	[[nodiscard]] inline auto block(::std::size_t index) noexcept -> Block &
+	{
+		return blocks[index];
+	}
+
+	[[nodiscard]] inline auto get_lm_head() noexcept -> LMHead &
+	{
+		return lm_head;
+	}
+
+	static constexpr ::std::int64_t batch{Batch};
+	static constexpr ::std::int64_t sequence_length{SeqLen};
+	static constexpr ::std::int64_t vocab_size{VocabSize};
+	static constexpr ::std::int64_t embed_dim{EmbedDim};
+	static constexpr ::std::int64_t heads{Heads};
+	static constexpr ::std::int64_t mlp_hidden{MLPHidden};
+	static constexpr ::std::size_t layer_count{Layers};
+
+private:
+	TokenEmbedding token_embedding;
+	PositionEmbedding position_embedding;
+	::std::vector<Block> blocks;
+	FinalNorm norm;
+	LMHead lm_head;
+};
+
+} // namespace detail
+
+template <::std::int64_t Batch, ::std::int64_t SeqLen,
+		  ::std::int64_t VocabSize, ::std::int64_t EmbedDim,
+		  ::std::int64_t Heads, ::std::int64_t MLPHidden,
+		  ::std::size_t Layers, DType dtype = DType::F32,
+		  Device device = Device::CPU>
+class TypedTransformer
+	: public ::torch::nn::ModuleHolder<
+		  detail::TypedTransformerImpl<Batch, SeqLen, VocabSize, EmbedDim,
+									   Heads, MLPHidden, Layers,
+									   dtype, device>>
+{
+public:
+	using Impl = detail::TypedTransformerImpl<Batch, SeqLen, VocabSize,
+											  EmbedDim, Heads, MLPHidden,
+											  Layers, dtype, device>;
+	using Base = ::torch::nn::ModuleHolder<Impl>;
+	using Base::Base;
+
+	static constexpr ::std::int64_t batch{Impl::batch};
+	static constexpr ::std::int64_t sequence_length{Impl::sequence_length};
+	static constexpr ::std::int64_t vocab_size{Impl::vocab_size};
+	static constexpr ::std::int64_t embed_dim{Impl::embed_dim};
+	static constexpr ::std::int64_t heads{Impl::heads};
+	static constexpr ::std::int64_t mlp_hidden{Impl::mlp_hidden};
+	static constexpr ::std::size_t layer_count{Impl::layer_count};
+};
+
+} // namespace typetorch

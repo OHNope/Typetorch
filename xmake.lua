@@ -108,6 +108,7 @@ local typetorch_module_files = {
     "src/typetorch/nnModules/sequential.mpp",
     "src/typetorch/nnModules/mlp.mpp",
     "src/typetorch/nnModules/activation.mpp",
+    "src/typetorch/nnModules/transformer.mpp",
     "src/typetorch/nnModules/flatten.mpp",
     "src/typetorch/nnModules/pooling.mpp",
     "src/typetorch/nnModules/nnModules.mpp",
@@ -408,6 +409,13 @@ target("typetorch_nnmodules_mlp_test")
     configure_typetorch_consumer_target({
         default = false,
         files = {"tests/nnmodules/mlp_test.cpp"},
+    })
+target_end()
+
+target("typetorch_nnmodules_transformer_test")
+    configure_typetorch_consumer_target({
+        default = false,
+        files = {"tests/nnmodules/transformer_test.cpp"},
     })
 target_end()
 

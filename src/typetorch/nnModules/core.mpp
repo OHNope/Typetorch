@@ -14,32 +14,61 @@ export namespace typetorch
 namespace detail
 {
 
-consteval inline auto member_nums(::std::meta::info const class_info) noexcept
+inline auto register_all_modules(auto &self) -> void
 {
-	constexpr auto ctx{::std::meta::access_context::current()};
-	return ::std::meta::nonstatic_data_members_of(class_info, ctx).size();
-}
+	constexpr auto ctx{
+		::std::meta::access_context::current()};
 
-consteval inline auto member_ptrs(::std::meta::info const class_info) noexcept
-{
-	constexpr auto ctx{::std::meta::access_context::current()};
-	return ::std::meta::nonstatic_data_members_of(class_info, ctx);
-}
+	constexpr auto members{
+		::std::define_static_array(
+			::std::meta::nonstatic_data_members_of(^^decltype(self), ctx))};
 
-template <::std::meta::info ClassInfo>
-consteval inline auto member_names() noexcept
-{
-	constexpr auto members{member_ptrs(ClassInfo)};
-	constexpr ::std::size_t N{members.size()};
-
-	::std::array<::std::string_view, N> result{};
-
-	for (::std::size_t i{0}; i < N; ++i)
+	template for (constexpr auto member : members)
 	{
-		result[i] = ::std::meta::identifier_of(members[i]);
-	}
+		if constexpr (::std::meta::has_identifier(member))
+		{
+			constexpr auto name{
+				::std::meta::identifier_of(member)};
 
-	return result;
+			constexpr auto member_type{
+				::std::meta::type_of(member)};
+
+			if constexpr (is_template_spec_of(member_type, ^^::std::vector))
+			{
+				auto &vec{self.[:member:]};
+
+				for (::std::size_t i{}; i < vec.size(); ++i)
+				{
+					self.register_module(
+						::std::string{name} + "_" + ::std::to_string(i),
+						vec[i]);
+				}
+			}
+			else if constexpr (is_template_spec_of(member_type, ^^::std::tuple))
+			{
+				if constexpr (requires { self.layer_count; })
+				{
+					static_assert(false, "should provide layer count in the class in order to registere the tuple member!");
+				};
+				template for (constexpr ::std::size_t I :
+							  ::std::views::iota(::std::size_t{}, self.layer_count))
+				{
+					self.register_module(::std::to_string(I),
+										 ::std::get<I>(self.[:member:]));
+				}
+			}
+			else
+			{
+				if constexpr (requires {
+								  self.register_module(::std::string{name}, self.[:member:]);
+							  })
+				{
+					static_assert(false, "the member of the parameter must be able to be registered to nn.Module system!");
+				};
+				self.register_module(::std::string{name}, self.[:member:]);
+			}
+		}
+	}
 }
 
 template <DType dtype, Device device>
@@ -90,10 +119,10 @@ consteval inline auto embedding_shape_meta(::std::span<::std::int64_t const> dim
 }
 
 consteval inline auto conv2d_output_dim(::std::int64_t input,
-									   ::std::int64_t kernel,
-									   ::std::int64_t stride,
-									   ::std::int64_t padding,
-									   ::std::int64_t dilation)
+										::std::int64_t kernel,
+										::std::int64_t stride,
+										::std::int64_t padding,
+										::std::int64_t dilation)
 	-> ::std::int64_t
 {
 	if (input == dyn)

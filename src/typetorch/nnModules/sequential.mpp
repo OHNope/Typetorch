@@ -5,6 +5,8 @@ import libtorch;
 import :types;
 import :nnModules_core;
 
+#include "../../meta_macros.inc"
+
 export namespace typetorch
 {
 
@@ -20,9 +22,8 @@ concept TypedModuleHolder =
 	::std::derived_from<typename ModuleKind::Impl, ::torch::nn::Module>;
 
 template <typename Input, TypedModuleHolder Module>
-using SequentialStepOutput = [: ::std::meta::remove_cvref(
-									^^decltype(::std::declval<typename Module::Impl &>().forward(
-										::std::declval<Input const &>()))):];
+using SequentialStepOutput = REMOVE_CVREF(decltype(::std::declval<typename Module::Impl &>().forward(
+	::std::declval<Input const &>())));
 
 template <::std::meta::info Input, ::std::meta::info Module,
 		  ::std::meta::info... Rest>
@@ -98,7 +99,7 @@ struct TypedSequentialImpl : ::torch::nn::Module
 	{
 		using ResultImpl =
 			TypedSequentialImpl<
-				Modules..., typename[: ::std::meta::remove_cvref(^^NewModule):]>;
+				Modules..., REMOVE_CVREF(NewModule)>;
 		return ::std::apply(
 			[&module](auto const &...modules) {
 				return ::std::make_shared<ResultImpl>(
@@ -162,7 +163,7 @@ public:
 	{
 		using Result =
 			Sequential<
-				Modules..., typename[: ::std::meta::remove_cvref(^^NewModule):]>;
+				Modules..., REMOVE_CVREF(NewModule)>;
 		return Result{this->ptr()->push_back(::std::move(module))};
 	}
 
@@ -181,6 +182,6 @@ public:
 template <class... Modules>
 	requires(sizeof...(Modules) > 0)
 Sequential(Modules...)
-	-> Sequential<typename[: ::std::meta::remove_cvref(^^Modules):]...>;
+	-> Sequential<REMOVE_CVREF(Modules)...>;
 
 } // namespace typetorch

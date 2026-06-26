@@ -8,6 +8,7 @@ export import :nnModules_layer_norm;
 export import :nnModules_rms_norm;
 export import :nnModules_sequential;
 export import :nnModules_mlp;
+export import :nnModules_transformer;
 export import :nnModules_activation;
 export import :nnModules_flatten;
 export import :nnModules_pooling;

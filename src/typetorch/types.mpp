@@ -21,8 +21,8 @@ struct Shape
 };
 
 consteval inline auto
-is_template_specialization_of(::std::meta::info type_reflect,
-							  ::std::meta::info expected_template) noexcept
+is_template_spec_of(::std::meta::info type_reflect,
+					::std::meta::info expected_template) noexcept
 	-> bool
 {
 	if (!::std::meta::has_template_arguments(type_reflect))
@@ -33,7 +33,7 @@ is_template_specialization_of(::std::meta::info type_reflect,
 }
 
 template <class T>
-concept ShapeLike = is_template_specialization_of(^^T, ^^Shape);
+concept ShapeLike = is_template_spec_of(^^T, ^^Shape);
 
 enum class DType
 {
@@ -64,6 +64,6 @@ template <ShapeLike ShapeKind, DType DTypeKind = DType::F32,
 class Tensor;
 
 template <class T>
-concept TensorLike = is_template_specialization_of(^^T, ^^Tensor);
+concept TensorLike = is_template_spec_of(^^T, ^^Tensor);
 
 } // namespace typetorch
