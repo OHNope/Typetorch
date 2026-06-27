@@ -2,7 +2,7 @@ set_project("typetorch")
 set_version("0.1.0")
 set_languages("c++26")
 set_policy("build.c++.modules.gcc.cxx11abi", true)
-set_policy("build.c++.modules.reuse", false)
+set_policy("build.c++.modules.reuse", true)
 
 local local_config = {}
 
@@ -85,35 +85,11 @@ local libtorch_variant = os.getenv("TYPETORCH_LIBTORCH_VARIANT") or "cu128"
 local libtorch_version = libtorch_variant == "cpu" and "2.8.0+cpu" or "2.8.0+cu128"
 add_requires("libtorch-bin " .. libtorch_version, {alias = "libtorch"})
 
-local libtorch_module_file = "src/libtorch.mpp"
 
-local typetorch_module_files = {
-    "src/typetorch/types.mpp",
-    "src/typetorch/torch_mappings.mpp",
-    "src/typetorch/shape_meta.mpp",
-    "src/typetorch/common.mpp",
-    "src/typetorch/runtime_checks.mpp",
-    "src/typetorch/tensor/core.mpp",
-    "src/typetorch/tensor/factory.mpp",
-    "src/typetorch/tensor/arithmetic.mpp",
-    "src/typetorch/tensor/view.mpp",
-    "src/typetorch/tensor/nn.mpp",
-    "src/typetorch/tensor/tensor.mpp",
-    "src/typetorch/nnModules/core.mpp",
-    "src/typetorch/nnModules/linear.mpp",
-    "src/typetorch/nnModules/conv2d.mpp",
-    "src/typetorch/nnModules/embedding.mpp",
-    "src/typetorch/nnModules/layer_norm.mpp",
-    "src/typetorch/nnModules/rms_norm.mpp",
-    "src/typetorch/nnModules/sequential.mpp",
-    "src/typetorch/nnModules/mlp.mpp",
-    "src/typetorch/nnModules/activation.mpp",
-    "src/typetorch/nnModules/transformer.mpp",
-    "src/typetorch/nnModules/flatten.mpp",
-    "src/typetorch/nnModules/pooling.mpp",
-    "src/typetorch/nnModules/nnModules.mpp",
-    "src/typetorch/typetorch.mpp"
-}
+
+if os.isfile("xmake_typetorch_modules.lua") then
+    includes("xmake_typetorch_modules.lua")
+end
 
 local typetorch_examples_module_files = {
     "src/examples/typetorch_examples.mpp",
@@ -121,7 +97,9 @@ local typetorch_examples_module_files = {
 }
 
 local function add_libtorch_module()
-    add_files(libtorch_module_file, {public = true})
+    for _, file in ipairs(libtorch_module_files) do
+        add_files(file, {public = true})
+    end
 end
 
 local function add_typetorch_modules()

@@ -9,46 +9,33 @@
 --   target("my_app")
 --       add_packages("typetorch")
 --       add_rules("typetorch.modules")
+--       add_typetorch_modules()
 --       add_files("src/main.cpp")
 
-local typetorch_module_files = {
-    "src/fast_io.mpp",
-    "src/fast_io.cpp",
-    "src/libtorch.mpp",
-    "src/typetorch/types.mpp",
-    "src/typetorch/torch_mappings.mpp",
-    "src/typetorch/shape_meta.mpp",
-    "src/typetorch/common.mpp",
-    "src/typetorch/runtime_checks.mpp",
-    "src/typetorch/tensor/core.mpp",
-    "src/typetorch/tensor/factory.mpp",
-    "src/typetorch/tensor/arithmetic.mpp",
-    "src/typetorch/tensor/view.mpp",
-    "src/typetorch/tensor/nn.mpp",
-    "src/typetorch/tensor/tensor.mpp",
-    "src/typetorch/nnModules/core.mpp",
-    "src/typetorch/nnModules/linear.mpp",
-    "src/typetorch/nnModules/conv2d.mpp",
-    "src/typetorch/nnModules/embedding.mpp",
-    "src/typetorch/nnModules/layer_norm.mpp",
-    "src/typetorch/nnModules/rms_norm.mpp",
-    "src/typetorch/nnModules/sequential.mpp",
-    "src/typetorch/nnModules/mlp.mpp",
-    "src/typetorch/nnModules/activation.mpp",
-    "src/typetorch/nnModules/flatten.mpp",
-    "src/typetorch/nnModules/pooling.mpp",
-    "src/typetorch/nnModules/nnModules.mpp",
-    "src/typetorch/typetorch.mpp",
-}
+local typetorch_root = os.scriptdir()
+
+if os.isfile(path.join(typetorch_root, "xmake_typetorch_modules.lua")) then
+    includes(path.join(typetorch_root, "xmake_typetorch_modules.lua"))
+end
+
+function add_typetorch_modules()
+    for _, file in ipairs(typetorch_module_files) do
+        add_files(path.join(typetorch_root, file))
+    end
+    for _, file in ipairs(libtorch_module_files) do
+        add_files(path.join(typetorch_root, file))
+    end
+    for _, file in ipairs(fast_io_module_files) do
+        add_files(path.join(typetorch_root, file))
+    end
+end
 
 rule("typetorch.modules")
-    after_load(function (target)
-        local pkg = target:pkg("typetorch")
-        if not pkg then
-            return
-        end
+    on_load(function (target)
         target:add("cxxflags", "-fmodules", {force = true})
         target:add("cxxflags", "-freflection", {force = true})
+        target:add("includedirs", path.join(typetorch_root, "src"))
+        target:add("includedirs", path.join(typetorch_root, "third_party", "fast_io", "include"))
         local relocate_ldflags = os.getenv("TYPETORCH_GCC_RELOCATE_LDFLAGS")
         if relocate_ldflags and relocate_ldflags ~= "" then
             for flag in relocate_ldflags:gmatch("%S+") do
@@ -56,18 +43,17 @@ rule("typetorch.modules")
                 target:add("shflags", flag, {force = true})
             end
         end
+    end)
+    after_load(function (target)
+        local pkg = target:pkg("typetorch")
+        if not pkg then
+            return
+        end
         for _, linkdir in ipairs(pkg:get("linkdirs") or {})
         do
             if os.isfile(path.join(linkdir, "libtorch.so")) then
                 target:add("rpathdirs", linkdir)
             end
-        end
-        local moddir = path.join(pkg:installdir(), "modules")
-        if not os.isdir(moddir) then
-            return
-        end
-        for _, file in ipairs(typetorch_module_files) do
-            target:add("files", path.join(moddir, file))
         end
     end)
 rule_end()

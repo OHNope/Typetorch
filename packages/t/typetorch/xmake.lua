@@ -1,38 +1,18 @@
-local module_files = {
-    "src/fast_io.mpp",
-    "src/fast_io.cpp",
-    "src/libtorch.mpp",
-    "src/typetorch/types.mpp",
-    "src/typetorch/torch_mappings.mpp",
-    "src/typetorch/shape_meta.mpp",
-    "src/typetorch/common.mpp",
-    "src/typetorch/runtime_checks.mpp",
-    "src/typetorch/tensor/core.mpp",
-    "src/typetorch/tensor/factory.mpp",
-    "src/typetorch/tensor/arithmetic.mpp",
-    "src/typetorch/tensor/view.mpp",
-    "src/typetorch/tensor/nn.mpp",
-    "src/typetorch/tensor/tensor.mpp",
-    "src/typetorch/nnModules/core.mpp",
-    "src/typetorch/nnModules/linear.mpp",
-    "src/typetorch/nnModules/conv2d.mpp",
-    "src/typetorch/nnModules/embedding.mpp",
-    "src/typetorch/nnModules/layer_norm.mpp",
-    "src/typetorch/nnModules/rms_norm.mpp",
-    "src/typetorch/nnModules/sequential.mpp",
-    "src/typetorch/nnModules/mlp.mpp",
-    "src/typetorch/nnModules/activation.mpp",
-    "src/typetorch/nnModules/flatten.mpp",
-    "src/typetorch/nnModules/pooling.mpp",
-    "src/typetorch/nnModules/nnModules.mpp",
-    "src/typetorch/typetorch.mpp",
+local typetorch_root = path.join(os.scriptdir(), "../../..")
+
+includes(path.join(typetorch_root, "xmake_typetorch_modules.lua"))
+
+local module_file_groups = {
+    fast_io_module_files,
+    libtorch_module_files,
+    typetorch_module_files,
 }
 
 package("typetorch")
     set_kind("library", {headeronly = true})
     set_description("Type-safe LibTorch tensor wrappers with C++26 compile-time contracts")
     set_license("MIT")
-    set_sourcedir(path.join(os.scriptdir(), "../../.."))
+    set_sourcedir(typetorch_root)
 
     local libtorch_variant = os.getenv("TYPETORCH_LIBTORCH_VARIANT") or "cu128"
     local libtorch_version = libtorch_variant == "cpu" and "2.8.0+cpu" or "2.8.0+cu128"
@@ -45,14 +25,13 @@ package("typetorch")
         os.cp("third_party/fast_io/include", package:installdir())
         os.cp("src/attributes.inc", incdir)
         os.cp("src/type_macros.inc", incdir)
-        os.mkdir(path.join(incdir, "typetorch", "nnModules"))
-        os.cp("src/typetorch/nnModules/smartptr.inc",
-              path.join(incdir, "typetorch", "nnModules", "smartptr.inc"))
 
-        for _, file in ipairs(module_files) do
-            local dst = path.join(moddir, file)
-            os.mkdir(path.directory(dst))
-            os.cp(file, dst)
+        for _, files in ipairs(module_file_groups) do
+            for _, file in ipairs(files) do
+                local dst = path.join(moddir, file)
+                os.mkdir(path.directory(dst))
+                os.cp(file, dst)
+            end
         end
     end)
 
