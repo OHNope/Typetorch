@@ -29,7 +29,7 @@ int main() {
         auto typed_result = typed->forward(Input23::unsafe_retain(input));
 
         // Compare against torch::rms_norm
-        auto raw_result = ::torch::rms_norm(input, {2, 3}, typed->weight);
+        auto raw_result = ::torch::rms_norm(input, {2, 3}, typed->weight, 1e-5);
 
         typetorch_test::expect_allclose("rmsnorm_affine", typed_result.unsafe_raw(), raw_result);
     }

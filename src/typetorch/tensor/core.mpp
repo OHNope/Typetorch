@@ -290,6 +290,12 @@ private:
 	::torch::Tensor impl_;
 };
 
+consteval inline auto make_tensor_meta(::std::initializer_list<::std::int64_t const> const dims, DType dtype, Device device) -> ::std::meta::info
+{
+	::std::vector<::std::meta::info> args{make_shape_meta(dims), ::std::meta::reflect_constant(dtype), ::std::meta::reflect_constant(device)};
+	return ::std::meta::substitute(^^Tensor, args);
+}
+
 // Free function declarations — defined in :tensor_arithmetic
 template <::std::int64_t Dim, TensorLike First, TensorLike... Rest>
 [[nodiscard]] inline auto cat(First const &first, Rest const &...rest);

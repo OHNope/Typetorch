@@ -32,6 +32,18 @@ is_template_spec_of(::std::meta::info type_reflect,
 	return ::std::meta::template_of(type_reflect) == expected_template;
 }
 
+consteval inline auto make_shape_meta(std::initializer_list<::std::int64_t const> const dims)
+{
+	::std::vector<::std::meta::info> args;
+
+	for (::std::int64_t const dim : dims)
+	{
+		args.push_back(std::meta::reflect_constant(dim));
+	}
+
+	return ::std::meta::substitute(^^Shape, args);
+}
+
 template <class T>
 concept ShapeLike = is_template_spec_of(^^T, ^^Shape);
 
