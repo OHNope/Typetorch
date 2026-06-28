@@ -53,8 +53,6 @@ struct TypedCNNImpl : ::torch::nn::Module
 {
 	static_assert(Channels::rank >= 2,
 				  "TypedCNN channels must contain input and at least one hidden width");
-	static_assert(shape_dims_all_positive<Channels>(),
-				  "TypedCNN channel dimensions must be positive");
 	static_assert(NumClasses > 0, "TypedCNN num_classes must be positive");
 	static_assert(KernelSize::rank == 2,
 				  "TypedCNN kernel_size must have rank 2");
@@ -67,12 +65,8 @@ struct TypedCNNImpl : ::torch::nn::Module
 				  "TypedCNN padding must be fully static");
 	static_assert(PoolOutput::dynamic_rank == 0,
 				  "TypedCNN pool_output must be fully static");
-	static_assert(shape_dims_all_positive<KernelSize>(),
-				  "TypedCNN kernel_size dimensions must be positive");
 	static_assert(Padding::dims[0] >= 0 && Padding::dims[1] >= 0,
 				  "TypedCNN padding dimensions must be non-negative");
-	static_assert(shape_dims_all_positive<PoolOutput>(),
-				  "TypedCNN pool_output dimensions must be positive");
 	static_assert(dtype != DType::Any,
 				  "TypedCNN parameters require a concrete dtype");
 	static_assert(device != Device::Any,
@@ -226,7 +220,7 @@ private:
 
 	template <Device ndevice, DType ndtype, ::std::size_t... I>
 	[[nodiscard]] inline auto
-	converted_convs(::std::index_sequence<I...>) const
+		converted_convs(::std::index_sequence<I...>) const
 		-> typename TypedCNNImpl<Channels, NumClasses, KernelSize, Padding,
 								 PoolOutput, ndtype, ndevice>::Convs
 	{
