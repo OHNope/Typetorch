@@ -1,5 +1,7 @@
 # API Notes
 
+Last updated: 2026-06-28.
+
 Typetorch wraps `torch::Tensor` in a move-only type carrying a static tensor contract:
 
 ```cpp

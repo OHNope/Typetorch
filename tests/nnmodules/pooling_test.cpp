@@ -4,30 +4,24 @@ import typetorch;
 import fast_io;
 
 #include "../test_support.inc"
+#include "../../src/torch_macros.inc"
 
 namespace
 {
 
-using Input =
-	typetorch::Tensor<typetorch::Shape<2, 3, 9, 10>,
-					  typetorch::DType::F32, typetorch::Device::CPU,
-					  typetorch::Layout::Contiguous>;
+using Input = TYPETORCH_TENSOR((2, 3, 9, 10));
 using MaxOutput =
-	typetorch::Tensor<typetorch::Shape<2, 3, 5, 5>,
-					  typetorch::DType::F32, typetorch::Device::CPU,
-					  typetorch::Layout::Any>;
+	TYPETORCH_TENSOR_LAYOUT((2, 3, 5, 5), typetorch::DType::F32,
+							typetorch::Device::CPU, typetorch::Layout::Any);
 using AvgOutput =
-	typetorch::Tensor<typetorch::Shape<2, 3, 4, 4>,
-					  typetorch::DType::F32, typetorch::Device::CPU,
-					  typetorch::Layout::Any>;
+	TYPETORCH_TENSOR_LAYOUT((2, 3, 4, 4), typetorch::DType::F32,
+							typetorch::Device::CPU, typetorch::Layout::Any);
 using AdaptiveOutput =
-	typetorch::Tensor<typetorch::Shape<2, 3, 2, 3>,
-					  typetorch::DType::F32, typetorch::Device::CPU,
-					  typetorch::Layout::Any>;
+	TYPETORCH_TENSOR_LAYOUT((2, 3, 2, 3), typetorch::DType::F32,
+							typetorch::Device::CPU, typetorch::Layout::Any);
 using AdaptiveKeepHeightOutput =
-	typetorch::Tensor<typetorch::Shape<2, 3, 9, 3>,
-					  typetorch::DType::F32, typetorch::Device::CPU,
-					  typetorch::Layout::Any>;
+	TYPETORCH_TENSOR_LAYOUT((2, 3, 9, 3), typetorch::DType::F32,
+							typetorch::Device::CPU, typetorch::Layout::Any);
 
 
 
@@ -75,7 +69,7 @@ int main()
 			.ceil_mode(true)}};
 	typetorch_test::expect_allclose(
 		"MaxPool2d",
-		max_pool->forward(Input::unsafe_retain(input)).unsafe_raw(),
+		max_pool->forward(TYPETORCH_RETAIN(input, (2, 3, 9, 10))).unsafe_raw(),
 		raw_max->forward(input));
 
 	Avg avg_pool;
@@ -87,7 +81,7 @@ int main()
 			.count_include_pad(false)}};
 	typetorch_test::expect_allclose(
 		"AvgPool2d",
-		avg_pool->forward(Input::unsafe_retain(input)).unsafe_raw(),
+		avg_pool->forward(TYPETORCH_RETAIN(input, (2, 3, 9, 10))).unsafe_raw(),
 		raw_avg->forward(input));
 
 	Adaptive adaptive_pool;
@@ -95,14 +89,14 @@ int main()
 		input, ::std::array<::std::int64_t, 2>{2, 3})};
 	typetorch_test::expect_allclose(
 		"AdaptiveAvgPool2d",
-		adaptive_pool->forward(Input::unsafe_retain(input)).unsafe_raw(),
+		adaptive_pool->forward(TYPETORCH_RETAIN(input, (2, 3, 9, 10))).unsafe_raw(),
 		raw_adaptive);
 	AdaptiveKeepHeight adaptive_keep_height;
 	auto raw_adaptive_keep_height{::torch::adaptive_avg_pool2d(
 		input, ::std::array<::std::int64_t, 2>{9, 3})};
 	typetorch_test::expect_allclose(
 		"AdaptiveAvgPool2d keep height",
-		adaptive_keep_height->forward(Input::unsafe_retain(input)).unsafe_raw(),
+		adaptive_keep_height->forward(TYPETORCH_RETAIN(input, (2, 3, 9, 10))).unsafe_raw(),
 		raw_adaptive_keep_height);
 
 
@@ -111,10 +105,8 @@ int main()
 		typetorch::AdaptiveAvgPool2d<typetorch::Shape<1, 1>>{},
 		typetorch::Flatten<1, -1>{}}};
 	using SequenceOutput =
-		typetorch::Tensor<typetorch::Shape<2, 3>,
-						  typetorch::DType::F32,
-						  typetorch::Device::CPU,
-						  typetorch::Layout::Any>;
+		TYPETORCH_TENSOR_LAYOUT((2, 3), typetorch::DType::F32,
+								typetorch::Device::CPU, typetorch::Layout::Any);
 	static_assert(::std::same_as<
 				  decltype(sequence->forward(
 					  ::std::declval<Input const &>())),

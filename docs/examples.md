@@ -1,8 +1,23 @@
 # Compile-Time Contract Examples
 
+Last updated: 2026-06-28.
+
 This file collects the full set of examples showing what Typetorch accepts and
 rejects at compile time. The README includes a shorter selection; this is the
 exhaustive reference.
+
+The current examples use the convenience tensor macros from `src/torch_macros.inc`
+where they improve readability:
+
+```cpp
+#include "torch_macros.inc"
+
+using Matrix23 = TYPETORCH_TENSOR((2, 3));
+using DynMatrix = TYPETORCH_TENSOR_LAYOUT((typetorch::dyn, typetorch::dyn),
+                                          typetorch::DType::F32,
+                                          typetorch::Device::CPU,
+                                          typetorch::Layout::Any);
+```
 
 ## What Compiles
 
@@ -127,6 +142,38 @@ auto ln = x.layer_norm<3>();        // OK: normalized_shape matches trailing dim
 auto rn = x.rms_norm<3>();          // OK: same check for RMS norm
 
 auto m = x.masked_fill(BoolMat::ones(), torch::Scalar{0.0F});  // OK: mask must be Bool dtype
+```
+
+### NN modules — typed forward contracts
+
+```cpp
+using Input  = TYPETORCH_TENSOR_LAYOUT((typetorch::dyn, 3),
+                                       typetorch::DType::F32,
+                                       typetorch::Device::CPU,
+                                       typetorch::Layout::Any);
+using Output = TYPETORCH_TENSOR_LAYOUT((typetorch::dyn, 2),
+                                       typetorch::DType::F32,
+                                       typetorch::Device::CPU,
+                                       typetorch::Layout::Any);
+
+using Net = typetorch::Sequential<typetorch::Linear<3, 4>,
+                                  typetorch::Linear<4, 2>>;
+
+static_assert(Net::size == 2);
+static_assert(std::is_same_v<decltype(std::declval<Net::Impl &>().forward(
+                              std::declval<Input const &>())),
+                              Output>);
+```
+
+```cpp
+using Image = TYPETORCH_TENSOR((3, 32, 48));
+using Conv = typetorch::Conv2d<3, 8, typetorch::Shape<3, 5>,
+                               typetorch::Shape<2, 1>,
+                               typetorch::Shape<1, 2>>;
+
+auto conv = Conv{};
+auto y = conv->forward(Image::randn());
+// OK: output type is Tensor<Shape<8,16,48>, F32, CPU, Any>
 ```
 
 ### arange — fully static tensor creation

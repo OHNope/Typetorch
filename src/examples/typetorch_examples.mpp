@@ -4,26 +4,28 @@ import std;
 import libtorch;
 import typetorch;
 
+#include "../torch_macros.inc"
+
 export namespace typetorch_examples
 {
 
-using Vector = typetorch::Tensor<typetorch::Shape<typetorch::dyn>,
-								 typetorch::DType::F32, typetorch::Device::CPU,
-								 typetorch::Layout::Any>;
-using Matrix = typetorch::Tensor<typetorch::Shape<typetorch::dyn, typetorch::dyn>,
-								 typetorch::DType::F32, typetorch::Device::CPU,
-								 typetorch::Layout::Any>;
-using Matrix3In = typetorch::Tensor<typetorch::Shape<typetorch::dyn, 3>,
-									typetorch::DType::F32, typetorch::Device::CPU,
-									typetorch::Layout::Any>;
-using Matrix3Out = typetorch::Tensor<typetorch::Shape<3, typetorch::dyn>,
-									 typetorch::DType::F32, typetorch::Device::CPU,
-									 typetorch::Layout::Any>;
-using Matrix2Out = typetorch::Tensor<typetorch::Shape<typetorch::dyn, 2>,
-									 typetorch::DType::F32, typetorch::Device::CPU,
-									 typetorch::Layout::Any>;
-using SizeVector = typetorch::Tensor<typetorch::Shape<1>, typetorch::DType::I64,
-									 typetorch::Device::CPU>;
+using Vector =
+	TYPETORCH_TENSOR_LAYOUT((typetorch::dyn), typetorch::DType::F32,
+							typetorch::Device::CPU, typetorch::Layout::Any);
+using Matrix =
+	TYPETORCH_TENSOR_LAYOUT((typetorch::dyn, typetorch::dyn),
+							typetorch::DType::F32,
+							typetorch::Device::CPU, typetorch::Layout::Any);
+using Matrix3In =
+	TYPETORCH_TENSOR_LAYOUT((typetorch::dyn, 3), typetorch::DType::F32,
+							typetorch::Device::CPU, typetorch::Layout::Any);
+using Matrix3Out =
+	TYPETORCH_TENSOR_LAYOUT((3, typetorch::dyn), typetorch::DType::F32,
+							typetorch::Device::CPU, typetorch::Layout::Any);
+using Matrix2Out =
+	TYPETORCH_TENSOR_LAYOUT((typetorch::dyn, 2), typetorch::DType::F32,
+							typetorch::Device::CPU, typetorch::Layout::Any);
+using SizeVector = TYPETORCH_TENSOR_OPT((1), typetorch::DType::I64, typetorch::Device::CPU);
 
 SizeVector checked_vector_sizes(Vector const &x);
 Vector add_vectors(Vector const &a, Vector const &b);

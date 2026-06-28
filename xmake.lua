@@ -341,6 +341,14 @@ target("typetorch_tensor_arithmetic_test")
         files = {"tests/tensor_arithmetic_test.cpp"},
     })
 target_end()
+
+target("typetorch_tensor_factory_view_test")
+    configure_typetorch_consumer_target({
+        default = false,
+        files = {"tests/tensor_factory_view_test.cpp"},
+    })
+target_end()
+
 target("typetorch_nnmodules_linear_test")
     configure_typetorch_consumer_target({
         default = false,

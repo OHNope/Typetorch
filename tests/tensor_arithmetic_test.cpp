@@ -4,36 +4,34 @@ import typetorch;
 import fast_io;
 
 #include "test_support.inc"
+#include "../src/torch_macros.inc"
 
 namespace
 {
 
-using Matrix = typetorch::Tensor<typetorch::Shape<2, 3>, typetorch::DType::F32,
-								 typetorch::Device::CPU, typetorch::Layout::Contiguous>;
-using MatrixAny = typetorch::Tensor<typetorch::Shape<2, 3>, typetorch::DType::F32,
-									typetorch::Device::CPU, typetorch::Layout::Any>;
-using Bias = typetorch::Tensor<typetorch::Shape<3>, typetorch::DType::F32,
-							   typetorch::Device::CPU, typetorch::Layout::Contiguous>;
-using Column = typetorch::Tensor<typetorch::Shape<2, 1>, typetorch::DType::F32,
-								 typetorch::Device::CPU, typetorch::Layout::Contiguous>;
-using MatrixFlat = typetorch::Tensor<typetorch::Shape<6>, typetorch::DType::F32,
-									 typetorch::Device::CPU, typetorch::Layout::Contiguous>;
-using MatrixUnsqueezed = typetorch::Tensor<typetorch::Shape<1, 2, 3>, typetorch::DType::F32,
-										   typetorch::Device::CPU, typetorch::Layout::Contiguous>;
-using Squeezable = typetorch::Tensor<typetorch::Shape<1, 2, 1, 3>, typetorch::DType::F32,
-									 typetorch::Device::CPU, typetorch::Layout::Contiguous>;
-using Squeezed = typetorch::Tensor<typetorch::Shape<2, 3>, typetorch::DType::F32,
-								   typetorch::Device::CPU, typetorch::Layout::Contiguous>;
-using BoolMatrix = typetorch::Tensor<typetorch::Shape<2, 3>, typetorch::DType::Bool,
-									 typetorch::Device::CPU, typetorch::Layout::Contiguous>;
-using CatRows = typetorch::Tensor<typetorch::Shape<4, 3>, typetorch::DType::F32,
-								  typetorch::Device::CPU, typetorch::Layout::Any>;
-using CatCols = typetorch::Tensor<typetorch::Shape<2, 6>, typetorch::DType::F32,
-								  typetorch::Device::CPU, typetorch::Layout::Any>;
-using StackOuter = typetorch::Tensor<typetorch::Shape<2, 2, 3>, typetorch::DType::F32,
-									 typetorch::Device::CPU, typetorch::Layout::Any>;
-using StackLast = typetorch::Tensor<typetorch::Shape<2, 3, 2>, typetorch::DType::F32,
-									typetorch::Device::CPU, typetorch::Layout::Any>;
+using Matrix = TYPETORCH_TENSOR((2, 3));
+using MatrixAny =
+	TYPETORCH_TENSOR_LAYOUT((2, 3), typetorch::DType::F32,
+							typetorch::Device::CPU, typetorch::Layout::Any);
+using Bias = TYPETORCH_TENSOR((3));
+using Column = TYPETORCH_TENSOR((2, 1));
+using MatrixFlat = TYPETORCH_TENSOR((6));
+using MatrixUnsqueezed = TYPETORCH_TENSOR((1, 2, 3));
+using Squeezable = TYPETORCH_TENSOR((1, 2, 1, 3));
+using Squeezed = TYPETORCH_TENSOR((2, 3));
+using BoolMatrix = TYPETORCH_TENSOR_OPT((2, 3), typetorch::DType::Bool, typetorch::Device::CPU);
+using CatRows =
+	TYPETORCH_TENSOR_LAYOUT((4, 3), typetorch::DType::F32,
+							typetorch::Device::CPU, typetorch::Layout::Any);
+using CatCols =
+	TYPETORCH_TENSOR_LAYOUT((2, 6), typetorch::DType::F32,
+							typetorch::Device::CPU, typetorch::Layout::Any);
+using StackOuter =
+	TYPETORCH_TENSOR_LAYOUT((2, 2, 3), typetorch::DType::F32,
+							typetorch::Device::CPU, typetorch::Layout::Any);
+using StackLast =
+	TYPETORCH_TENSOR_LAYOUT((2, 3, 2), typetorch::DType::F32,
+							typetorch::Device::CPU, typetorch::Layout::Any);
 
 static_assert(::std::same_as<
 			  decltype(::std::declval<Matrix const &>().sub(

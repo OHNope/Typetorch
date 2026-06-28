@@ -3,20 +3,19 @@ import libtorch;
 import typetorch;
 import fast_io;
 
+#include "../src/torch_macros.inc"
+
 namespace
 {
 using Clock = ::std::chrono::steady_clock;
 using Ns = ::std::chrono::nanoseconds;
 
-using Matrix = typetorch::Tensor<typetorch::Shape<typetorch::dyn, typetorch::dyn>,
-								 typetorch::DType::F32, typetorch::Device::CPU,
-								 typetorch::Layout::Any>;
-using StaticMatrix = typetorch::Tensor<typetorch::Shape<64, 64>, typetorch::DType::F32,
-									   typetorch::Device::CPU,
-									   typetorch::Layout::Contiguous>;
-using StaticCube = typetorch::Tensor<typetorch::Shape<16, 32, 8>, typetorch::DType::F32,
-									 typetorch::Device::CPU,
-									 typetorch::Layout::Contiguous>;
+using Matrix =
+	TYPETORCH_TENSOR_LAYOUT((typetorch::dyn, typetorch::dyn),
+							typetorch::DType::F32,
+							typetorch::Device::CPU, typetorch::Layout::Any);
+using StaticMatrix = TYPETORCH_TENSOR((64, 64));
+using StaticCube = TYPETORCH_TENSOR((16, 32, 8));
 
 struct Sample
 {
@@ -105,10 +104,14 @@ int main(int argc, char **argv)
 	auto const rhs{::torch::randn({64, 64}, options)};
 	auto const cube{::torch::randn({16, 32, 8}, options)};
 
-	auto lhs_dyn{Matrix::unsafe_retain(lhs)};
-	auto rhs_dyn{Matrix::unsafe_retain(rhs)};
-	auto lhs_static{StaticMatrix::unsafe_retain(lhs)};
-	auto rhs_static{StaticMatrix::unsafe_retain(rhs)};
+	auto lhs_dyn{TYPETORCH_RETAIN_LAYOUT(lhs, (typetorch::dyn, typetorch::dyn),
+										 typetorch::DType::F32,
+										 typetorch::Device::CPU, typetorch::Layout::Any)};
+	auto rhs_dyn{TYPETORCH_RETAIN_LAYOUT(rhs, (typetorch::dyn, typetorch::dyn),
+										 typetorch::DType::F32,
+										 typetorch::Device::CPU, typetorch::Layout::Any)};
+	auto lhs_static{TYPETORCH_RETAIN(lhs, (64, 64))};
+	auto rhs_static{TYPETORCH_RETAIN(rhs, (64, 64))};
 
 	::std::vector<Sample> samples;
 	samples.reserve(6);
@@ -124,13 +127,13 @@ int main(int argc, char **argv)
 		[&] { return lhs_static.matmul(rhs_static).unwrap(); }));
 	samples.push_back(benchmark(
 		"transpose.static", iterations, [&] { auto x{lhs}; return x.transpose(0, 1); },
-		[&] { return StaticMatrix::unsafe_retain(lhs).transpose<0, 1>().unwrap(); }));
+		[&] { return TYPETORCH_RETAIN(lhs, (64, 64)).transpose<0, 1>().unwrap(); }));
 	samples.push_back(benchmark(
 		"view.static", iterations, [&] { auto x{lhs}; return x.view({4096}); },
-		[&] { return StaticMatrix::unsafe_retain(lhs).view<4096>().unwrap(); }));
+		[&] { return TYPETORCH_RETAIN(lhs, (64, 64)).view<4096>().unwrap(); }));
 	samples.push_back(benchmark(
 		"permute.static", iterations, [&] { auto x{cube}; return x.permute({0, 2, 1}); },
-		[&] { return StaticCube::unsafe_retain(cube).permute<0, 2, 1>().unwrap(); }));
+		[&] { return TYPETORCH_RETAIN(cube, (16, 32, 8)).permute<0, 2, 1>().unwrap(); }));
 
 	::fast_io::io::println("iterations=", iterations,
 						   ", threads=", ::torch::get_num_threads());

@@ -4,13 +4,12 @@ import typetorch;
 import fast_io;
 
 #include "../test_support.inc"
+#include "../../src/torch_macros.inc"
 
 namespace {
 
-using FloatInput = typetorch::Tensor<typetorch::Shape<4, 3>, typetorch::DType::F32,
-                                     typetorch::Device::CPU, typetorch::Layout::Contiguous>;
-using SingleInput = typetorch::Tensor<typetorch::Shape<2, 4>, typetorch::DType::F32,
-                                       typetorch::Device::CPU, typetorch::Layout::Contiguous>;
+using FloatInput = TYPETORCH_TENSOR((4, 3));
+using SingleInput = TYPETORCH_TENSOR((2, 4));
 
 
 
@@ -28,7 +27,7 @@ int main() {
 
         auto input = ::torch::randn({4, 3}, typetorch_test::f32_cpu_options());
         auto expected = raw->forward(input);
-        auto actual = typed->forward(FloatInput::unsafe_retain(input));
+        auto actual = typed->forward(TYPETORCH_RETAIN(input, (4, 3)));
 
         typetorch_test::expect_allclose_detailed("linear_3_to_2_with_bias", 11, actual.unsafe_raw(), expected);
     }
@@ -43,7 +42,7 @@ int main() {
 
         auto input = ::torch::randn({2, 4}, typetorch_test::f32_cpu_options());
         auto expected = raw->forward(input);
-        auto actual = typed->forward(SingleInput::unsafe_retain(input));
+        auto actual = typed->forward(TYPETORCH_RETAIN(input, (2, 4)));
 
         typetorch_test::expect_allclose_detailed("linear_4_to_1_no_bias", 12, actual.unsafe_raw(), expected);
     }
@@ -69,9 +68,7 @@ int main() {
         auto raw_f16{::torch::nn::Linear{::torch::nn::LinearOptions(3, 2).bias(true)}};
         raw_f16->weight.set_data(raw_f16_weight);
         raw_f16->bias.set_data(raw_f16_bias);
-        using F16Input = typetorch::Tensor<typetorch::Shape<4, 3>, typetorch::DType::F16,
-                                            typetorch::Device::CPU, typetorch::Layout::Contiguous>;
-        auto actual_f16 = f16->forward(F16Input::unsafe_retain(f16_input));
+        auto actual_f16 = f16->forward(TYPETORCH_RETAIN_OPT(f16_input, (4, 3), typetorch::DType::F16, typetorch::Device::CPU));
         auto actual_f16_f32 = actual_f16.unsafe_raw().to(::torch::kFloat);
         auto expected_f16_f32 = raw_f16->forward(f16_input).to(::torch::kFloat);
         typetorch_test::expect_allclose_detailed(

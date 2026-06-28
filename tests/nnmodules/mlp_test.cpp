@@ -4,18 +4,16 @@ import typetorch;
 import fast_io;
 
 #include "../test_support.inc"
+#include "../../src/torch_macros.inc"
 
 namespace
 {
 
 using MLP = typetorch::TypedMLP<typetorch::Shape<3, 5, 4, 2>>;
-using Input =
-	typetorch::Tensor<typetorch::Shape<7, 3>, typetorch::DType::F32,
-					  typetorch::Device::CPU,
-					  typetorch::Layout::Contiguous>;
+using Input = TYPETORCH_TENSOR((7, 3));
 using Output =
-	typetorch::Tensor<typetorch::Shape<7, 2>, typetorch::DType::F32,
-					  typetorch::Device::CPU, typetorch::Layout::Any>;
+	TYPETORCH_TENSOR_LAYOUT((7, 2), typetorch::DType::F32,
+							typetorch::Device::CPU, typetorch::Layout::Any);
 
 
 } // namespace
@@ -57,7 +55,7 @@ int main()
 	auto expected{
 		raw2->forward(::torch::relu(raw1->forward(
 			::torch::relu(raw0->forward(input)))))};
-	auto actual{typed->forward(Input::unsafe_retain(input))};
+	auto actual{typed->forward(TYPETORCH_RETAIN(input, (7, 3)))};
 	if (!::torch::allclose(actual.unsafe_raw(), expected))
 	{
 		::fast_io::io::perrln("TypedMLP forward mismatch");

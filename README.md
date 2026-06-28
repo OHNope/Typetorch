@@ -11,15 +11,20 @@ at runtime. LibTorch still owns all storage, kernels, autograd, and device execu
 ```cpp
 import typetorch;
 
-// Define typed tensor aliases — these ARE the types
-using Matrix = typetorch::Tensor<
-    typetorch::Shape<2, 3>,          // 2x3 matrix — both dims known at compile time
-    typetorch::DType::F32,           // float32
-    typetorch::Device::CPU,          // CPU tensor
-    typetorch::Layout::Contiguous>;  // dense row-major storage
+#include "torch_macros.inc" // convenience aliases used by the in-repo examples
 
-using Vector  = typetorch::Tensor<typetorch::Shape<typetorch::dyn>, ...>;
-//                                     ^^^ runtime-only dimension
+// Define typed tensor aliases. These ARE the types.
+using Matrix = TYPETORCH_TENSOR((2, 3)); // Shape<2,3>, F32, CPU, Contiguous
+using Vector = TYPETORCH_TENSOR_LAYOUT((typetorch::dyn),
+                                       typetorch::DType::F32,
+                                       typetorch::Device::CPU,
+                                       typetorch::Layout::Any);
+
+// dyn marks a runtime-only dimension.
+using Batch3 = TYPETORCH_TENSOR_LAYOUT((typetorch::dyn, 3),
+                                       typetorch::DType::F32,
+                                       typetorch::Device::CPU,
+                                       typetorch::Layout::Any);
 
 // Enter typed code: validate raw tensor at the boundary
 auto raw  = torch::arange(6, opts).view({2, 3});
@@ -27,6 +32,12 @@ auto x    = Matrix::retain(raw);   // runtime contract check
 auto y    = Matrix::ones();        // factory, no raw tensor needed
 auto z    = x.add(y);             // shapes match -> compiles, result type computed statically
 auto flat = x.flatten<>();        // Shape<2,3> -> Shape<6>, all at compile time
+
+// NN modules carry typed input/output contracts too.
+using Linear3To2 = typetorch::Linear<3, 2>;
+auto layer = Linear3To2{};
+auto y2 = layer->forward(Batch3::retain(torch::randn({4, 3}, opts)));
+// y2 type: Tensor<Shape<dyn,2>, F32, CPU, Any>
 
 // Leave typed code: recover the raw handle
 torch::Tensor out = std::move(flat).unwrap();
@@ -336,38 +347,41 @@ Release-build forwarding overhead is within measurement noise for all core
 operations — see [docs/performance-and-size.md](docs/performance-and-size.md) for
 the full benchmark tables and methodology.
 
-### Forwarding Benchmark (release, 2026-06-24, 10000 iterations)
+### Forwarding Benchmark (release, 2026-06-28, 50000 iterations)
 
 | Operation | Raw ns/op | Typetorch ns/op | Ratio |
 | --- | ---: | ---: | ---: |
-| `add.dynamic` | 2201.94 | 2030.83 | 0.92 |
-| `add.static` | 2244.88 | 2222.38 | 0.99 |
-| `matmul.static` | 10176.55 | 10195.68 | 1.00 |
-| `transpose.static` | 759.13 | 765.81 | 1.01 |
-| `view.static` | 598.36 | 589.59 | 0.99 |
-| `permute.static` | 882.68 | 879.24 | 1.00 |
+| `add.dynamic` | 1176.03 | 1180.86 | 1.00 |
+| `add.static` | 1181.66 | 1180.98 | 1.00 |
+| `matmul.static` | 6708.69 | 6695.06 | 1.00 |
+| `transpose.static` | 390.83 | 389.72 | 1.00 |
+| `view.static` | 295.69 | 294.99 | 1.00 |
+| `permute.static` | 455.98 | 457.28 | 1.00 |
 
-All ratios are within 2.3% of 1.0 — **zero-cost abstraction confirmed.**
+All ratios are within 0.5% of 1.0 — **zero-cost abstraction confirmed.**
 
-### Binary Size (release, 2026-06-24, with attribute/extensions)
+### Binary Size (release, 2026-06-28, with attribute/extensions)
 
-compared to the previous snapshot.
+Measured with `size` after a release build.
 
 | Target | text | data | bss | dec | hex |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| `typetorch_forwarding_benchmark` | 49430 | 1808 | 200 | 51438 | c8ee |
-| `binary_size_libtorch_probe` | 22356 | 1696 | 200 | 24252 | 5ebc |
-| `binary_size_tensor_checked_probe` | 30117 | 1728 | 200 | 32045 | 7d2d |
-| `binary_size_tensor_unsafe_probe` | 22236 | 1696 | 200 | 24132 | 5e44 |
-| `typetorch_tensor_arithmetic_test` | 84238 | 2432 | 200 | 86870 | 15356 |
+| `typetorch_forwarding_benchmark` | 49096 | 1824 | 200 | 51120 | c7b0 |
+| `binary_size_libtorch_probe` | 21507 | 1712 | 200 | 23419 | 5b7b |
+| `binary_size_tensor_checked_probe` | 29022 | 1744 | 200 | 30966 | 78f6 |
+| `binary_size_tensor_unsafe_probe` | 21443 | 1712 | 200 | 23355 | 5b3b |
+| `typetorch_tensor_arithmetic_test` | 81033 | 2336 | 200 | 83569 | 14671 |
+| `typetorch_cpp_debug` | 120335 | 3520 | 200 | 124055 | 1e497 |
 
 Key comparisons:
-- **unsafe vs native** (22236 vs 22356): **-120 bytes (-0.5%)** — Typetorch forwarding is a true zero-cost abstraction.
-- **checked vs native** (30117 vs 22356): +7761 bytes (+34.7%) — cost of Typetorch wrapper + runtime boundary validation.
-- **checked vs unsafe** (30117 vs 22236): +7881 bytes (+35.4%) — isolated cost of runtime contract checks.
+- **unsafe vs native** (21443 vs 21507): **-64 bytes (-0.3%)** — Typetorch forwarding is a true zero-cost abstraction.
+- **checked vs native** (29022 vs 21507): +7515 bytes (+34.9%) — cost of Typetorch wrapper + runtime boundary validation.
+- **checked vs unsafe** (29022 vs 21443): +7579 bytes (+35.3%) — isolated cost of runtime contract checks.
 
-Arithmetic test (84238 text) exercises all op categories: arithmetic, view, NN, aggregate.
-All arithmetic tests pass in both debug and release builds.
+Arithmetic test (81033 text) exercises arithmetic, view, NN, and aggregate op
+categories. The current release run printed `typetorch tensor arithmetic tests
+passed`; `typetorch_cpp_debug` also runs the latest example module and prints
+factory, view, permute, typed transpose, and raw/typed interop examples.
 
 ## Using Typetorch in Your Project
 

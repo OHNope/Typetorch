@@ -50,7 +50,12 @@ template <::std::int64_t... Dims>
 [[nodiscard]] TYPETORCH_HOT inline auto Tensor<ShapeKind, DTypeKind, DeviceKind, LayoutKind>::reshape() &&
     requires(layout == Layout::Contiguous)
 {
-    return view<Dims...>();
+    detail::check_contiguous_compiletime(LayoutKind);
+    constexpr ::std::int64_t dims[]{Dims...};
+    using Result = Tensor<VIEW_SHAPE_T(ShapeKind, dims), DTypeKind, DeviceKind,
+                          Layout::Contiguous>;
+    return Result::unsafe_move(
+        unsafe_raw().view(dims));
 }
 
 // reshape (non-contiguous)

@@ -4,13 +4,12 @@ import typetorch;
 import fast_io;
 
 #include "../test_support.inc"
+#include "../../src/torch_macros.inc"
 
 namespace {
 
-using Input23 = typetorch::Tensor<typetorch::Shape<2, 3>, typetorch::DType::F32,
-                                   typetorch::Device::CPU, typetorch::Layout::Contiguous>;
-using Input224 = typetorch::Tensor<typetorch::Shape<2, 2, 4>, typetorch::DType::F32,
-                                    typetorch::Device::CPU, typetorch::Layout::Contiguous>;
+using Input23 = TYPETORCH_TENSOR((2, 3));
+using Input224 = TYPETORCH_TENSOR((2, 2, 4));
 
 
 
@@ -26,7 +25,7 @@ int main() {
         typed->weight.set_data(::torch::ones({2, 3}, typetorch_test::f32_cpu_options()).mul(0.5));
 
         auto input = ::torch::randn({2, 3}, typetorch_test::f32_cpu_options());
-        auto typed_result = typed->forward(Input23::unsafe_retain(input));
+        auto typed_result = typed->forward(TYPETORCH_RETAIN(input, (2, 3)));
 
         // Compare against torch::rms_norm
         auto raw_result = ::torch::rms_norm(input, {2, 3}, typed->weight, 1e-5);
@@ -40,7 +39,7 @@ int main() {
         RN typed(/*eps=*/1e-5, /*elementwise_affine=*/false);
 
         auto input = ::torch::randn({2, 2, 4}, typetorch_test::f32_cpu_options());
-        auto typed_result = typed->forward(Input224::unsafe_retain(input));
+        auto typed_result = typed->forward(TYPETORCH_RETAIN(input, (2, 2, 4)));
 
         auto raw_result = ::torch::rms_norm(input, {4}, {}, 1e-5);
 

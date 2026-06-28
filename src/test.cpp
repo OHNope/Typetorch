@@ -3,10 +3,11 @@ import libtorch;
 import typetorch;
 import fast_io;
 
+#include "torch_macros.inc"
+
 int main()
 {
-	using Matrix = typetorch::Tensor<typetorch::Shape<2, 3>, typetorch::DType::F32,
-									 typetorch::Device::CPU, typetorch::Layout::Contiguous>;
+	using Matrix = TYPETORCH_TENSOR((2, 3));
 
 	static_assert(Matrix::shape::rank == 2);
 	static_assert(Matrix::dtype == typetorch::DType::F32);

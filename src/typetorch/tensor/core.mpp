@@ -290,10 +290,20 @@ private:
 	::torch::Tensor impl_;
 };
 
-consteval inline auto make_tensor_meta(::std::initializer_list<::std::int64_t const> const dims, DType dtype, Device device) -> ::std::meta::info
+template <::std::size_t N>
+consteval inline auto make_tensor_meta(::std::array<::std::int64_t, N> const dims, DType dtype = DType::F32, Device device = Device::CPU) noexcept -> ::std::meta::info
 {
-	::std::vector<::std::meta::info> args{make_shape_meta(dims), ::std::meta::reflect_constant(dtype), ::std::meta::reflect_constant(device)};
-	return ::std::meta::substitute(^^Tensor, args);
+	::std::vector<::std::meta::info> shape_args;
+
+	for (::std::int64_t const dim : dims)
+	{
+		shape_args.push_back(::std::meta::reflect_constant(dim));
+	};
+
+	return ::std::meta::substitute(^^Tensor, {
+												 ::std::meta::substitute(^^Shape,
+																		 shape_args),
+												 ::std::meta::reflect_constant(dtype), ::std::meta::reflect_constant(device)});
 }
 
 // Free function declarations — defined in :tensor_arithmetic

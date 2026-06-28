@@ -4,13 +4,14 @@ import typetorch;
 import fast_io;
 
 #include "../src/attributes.inc"
+#include "../src/torch_macros.inc"
 
 namespace typetorch_binary_size_tensor_probe
 {
 
-using Vector = typetorch::Tensor<typetorch::Shape<typetorch::dyn>,
-								 typetorch::DType::F32, typetorch::Device::CPU,
-								 typetorch::Layout::Any>;
+using Vector =
+	TYPETORCH_TENSOR_LAYOUT((typetorch::dyn), typetorch::DType::F32,
+							typetorch::Device::CPU, typetorch::Layout::Any);
 TYPETORCH_SIZE_NOINLINE auto raw_identity(::torch::Tensor const &x) -> ::torch::Tensor
 {
 	return x;

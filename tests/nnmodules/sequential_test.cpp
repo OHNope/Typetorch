@@ -4,11 +4,11 @@ import typetorch;
 import fast_io;
 
 #include "../test_support.inc"
+#include "../../src/torch_macros.inc"
 
 namespace {
 
-using Input = typetorch::Tensor<typetorch::Shape<2, 3>, typetorch::DType::F32,
-                                 typetorch::Device::CPU, typetorch::Layout::Contiguous>;
+using Input = TYPETORCH_TENSOR((2, 3));
 
 
 } // namespace
@@ -40,7 +40,7 @@ int main() {
 
         auto input = ::torch::randn({2, 3}, typetorch_test::f32_cpu_options());
         auto expected = raw->forward(input);
-        auto actual = seq->forward(Input::unsafe_retain(input));
+        auto actual = seq->forward(TYPETORCH_RETAIN(input, (2, 3)));
 
         if (!::torch::allclose(actual.unsafe_raw(), expected)) {
             ::fast_io::io::perrln("sequential_two_linear: mismatch; actual=",
@@ -97,7 +97,7 @@ int main() {
 
         auto input = ::torch::randn({2, 3}, typetorch_test::f32_cpu_options());
         auto expected = raw->forward(input);
-        auto actual = seq->forward(Input::unsafe_retain(input));
+        auto actual = seq->forward(TYPETORCH_RETAIN(input, (2, 3)));
 
         if (!::torch::allclose(actual.unsafe_raw(), expected)) {
             ::fast_io::io::perrln("sequential_linear_layernorm: mismatch");

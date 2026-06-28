@@ -4,63 +4,52 @@ import std;
 import libtorch;
 import typetorch;
 
+#include "../torch_macros.inc"
+
 namespace typetorch_examples
 {
 namespace detail
 {
 
-using Weight3To2 = typetorch::Tensor<typetorch::Shape<3, 2>, typetorch::DType::F32,
-								   typetorch::Device::CPU,
-								   typetorch::Layout::Any>;
-using StaticVector = typetorch::Tensor<typetorch::Shape<6>, typetorch::DType::F32,
-									 typetorch::Device::CPU,
-									 typetorch::Layout::Contiguous>;
-using StaticMatrix = typetorch::Tensor<typetorch::Shape<2, 3>, typetorch::DType::F32,
-									 typetorch::Device::CPU,
-									 typetorch::Layout::Contiguous>;
-using StaticMatrixT = typetorch::Tensor<typetorch::Shape<3, 2>, typetorch::DType::F32,
-									  typetorch::Device::CPU,
-									  typetorch::Layout::Any>;
-using StaticCube = typetorch::Tensor<typetorch::Shape<2, 3, 4>, typetorch::DType::F32,
-								   typetorch::Device::CPU,
-								   typetorch::Layout::Contiguous>;
+using Weight3To2 =
+	TYPETORCH_TENSOR_LAYOUT((3, 2), typetorch::DType::F32,
+							typetorch::Device::CPU, typetorch::Layout::Any);
+using StaticVector = TYPETORCH_TENSOR((6));
+using StaticMatrix = TYPETORCH_TENSOR((2, 3));
+using StaticMatrixT =
+	TYPETORCH_TENSOR_LAYOUT((3, 2), typetorch::DType::F32,
+							typetorch::Device::CPU, typetorch::Layout::Any);
+using StaticCube = TYPETORCH_TENSOR((2, 3, 4));
 using StaticCubePermuted =
-	typetorch::Tensor<typetorch::Shape<2, 4, 3>, typetorch::DType::F32,
-					typetorch::Device::CPU, typetorch::Layout::Any>;
+	TYPETORCH_TENSOR_LAYOUT((2, 4, 3), typetorch::DType::F32,
+							typetorch::Device::CPU, typetorch::Layout::Any);
 using StaticCubePermutedContiguous =
-	typetorch::Tensor<typetorch::Shape<2, 4, 3>, typetorch::DType::F32,
-					typetorch::Device::CPU, typetorch::Layout::Contiguous>;
-using StaticCubeIdentity =
-	typetorch::Tensor<typetorch::Shape<2, 3, 4>, typetorch::DType::F32,
-					typetorch::Device::CPU, typetorch::Layout::Contiguous>;
-using StaticImage =
-	typetorch::Tensor<typetorch::Shape<3, 32, 48>, typetorch::DType::F32,
-					typetorch::Device::CPU, typetorch::Layout::Contiguous>;
+	TYPETORCH_TENSOR((2, 4, 3));
+using StaticCubeIdentity = TYPETORCH_TENSOR((2, 3, 4));
+using StaticImage = TYPETORCH_TENSOR((3, 32, 48));
 using StaticImageConv =
-	typetorch::Tensor<typetorch::Shape<8, 16, 48>, typetorch::DType::F32,
-					typetorch::Device::CPU, typetorch::Layout::Any>;
+	TYPETORCH_TENSOR_LAYOUT((8, 16, 48), typetorch::DType::F32,
+							typetorch::Device::CPU, typetorch::Layout::Any);
 using DynamicImageBatch =
-	typetorch::Tensor<
-		typetorch::Shape<typetorch::dyn, 3, typetorch::dyn, 48>,
-		typetorch::DType::F32, typetorch::Device::CPU,
-		typetorch::Layout::Any>;
+	TYPETORCH_TENSOR_LAYOUT((typetorch::dyn, 3, typetorch::dyn, 48),
+							typetorch::DType::F32,
+							typetorch::Device::CPU, typetorch::Layout::Any);
 using DynamicImageBatchConv =
-	typetorch::Tensor<
-		typetorch::Shape<typetorch::dyn, 8, typetorch::dyn, 48>,
-		typetorch::DType::F32, typetorch::Device::CPU,
-		typetorch::Layout::Any>;
+	TYPETORCH_TENSOR_LAYOUT((typetorch::dyn, 8, typetorch::dyn, 48),
+							typetorch::DType::F32,
+							typetorch::Device::CPU, typetorch::Layout::Any);
 using TestConv2d =
 	typetorch::Conv2d<3, 8, typetorch::Shape<3, 5>,
 					  typetorch::Shape<2, 1>, typetorch::Shape<1, 2>>;
 using SequentialInput =
-	typetorch::Tensor<typetorch::Shape<5, 3>, typetorch::DType::F32,
-					typetorch::Device::CPU, typetorch::Layout::Any>;
+	TYPETORCH_TENSOR_LAYOUT((5, 3), typetorch::DType::F32,
+							typetorch::Device::CPU, typetorch::Layout::Any);
 using SequentialHidden =
-	typetorch::Tensor<typetorch::Shape<5, 4>, typetorch::DType::F32,
-					typetorch::Device::CPU, typetorch::Layout::Any>;
+	TYPETORCH_TENSOR_LAYOUT((5, 4), typetorch::DType::F32,
+							typetorch::Device::CPU, typetorch::Layout::Any);
 using SequentialOutput =
-	typetorch::Tensor<typetorch::Shape<5, 2>, typetorch::DType::F32,
-					typetorch::Device::CPU, typetorch::Layout::Any>;
+	TYPETORCH_TENSOR_LAYOUT((5, 2), typetorch::DType::F32,
+							typetorch::Device::CPU, typetorch::Layout::Any);
 using TestSequential =
 	typetorch::Sequential<typetorch::Linear<3, 4>,
 						  typetorch::Linear<4, 2>>;
@@ -128,9 +117,8 @@ static_assert(::std::is_same_v<decltype(StaticMatrix::arange<0, 6>()),
 							   StaticVector>);
 static_assert(::std::is_same_v<
 			  decltype(StaticMatrix::arange<0, 6, 2, typetorch::DType::I64>()),
-			  typetorch::Tensor<typetorch::Shape<3>, typetorch::DType::I64,
-							  typetorch::Device::CPU,
-							  typetorch::Layout::Contiguous>>);
+			  TYPETORCH_TENSOR_OPT((3), typetorch::DType::I64,
+									typetorch::Device::CPU)>);
 static_assert(::std::is_same_v<
 			  decltype(::std::declval<TestConv2d::Impl &>().forward(
 				  ::std::declval<StaticImage const &>())),
@@ -141,9 +129,7 @@ static_assert(::std::is_same_v<
 			  DynamicImageBatchConv>);
 static_assert(::std::is_same_v<
 			  decltype(::std::declval<TestConv2d::Impl const &>().typed_weight()),
-			  typetorch::Tensor<typetorch::Shape<8, 3, 3, 5>,
-							  typetorch::DType::F32,
-							  typetorch::Device::CPU>>);
+			  TYPETORCH_TENSOR((8, 3, 3, 5))>);
 static_assert(::std::is_default_constructible_v<TestConv2d>);
 static_assert(TestSequential::size == 2);
 static_assert(::std::is_same_v<

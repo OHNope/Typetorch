@@ -4,19 +4,15 @@ import typetorch;
 import fast_io;
 
 #include "../test_support.inc"
+#include "../../src/torch_macros.inc"
 
 namespace
 {
 
-using Input =
-	typetorch::Tensor<typetorch::Shape<2, 3, 4, 5>,
-					 typetorch::DType::F32, typetorch::Device::CPU,
-					 typetorch::Layout::Contiguous>;
+using Input = TYPETORCH_TENSOR((2, 3, 4, 5));
 using ReluOutput = Input;
 using FlattenOutput =
-	typetorch::Tensor<typetorch::Shape<2, 60>,
-					 typetorch::DType::F32, typetorch::Device::CPU,
-					 typetorch::Layout::Contiguous>;
+	TYPETORCH_TENSOR((2, 60));
 using Sequence =
 	typetorch::Sequential<typetorch::ReLU, typetorch::Flatten<1, -1>>;
 
@@ -45,7 +41,7 @@ int main()
 	auto sequence{
 		typetorch::Sequential{typetorch::ReLU{},
 							 typetorch::Flatten<1, -1>{}}};
-	auto actual{sequence->forward(Input::unsafe_retain(raw))};
+	auto actual{sequence->forward(TYPETORCH_RETAIN(raw, (2, 3, 4, 5)))};
 	auto expected{::torch::relu(raw).flatten(1, -1)};
 	if (!::torch::allclose(actual.unsafe_raw(), expected))
 	{

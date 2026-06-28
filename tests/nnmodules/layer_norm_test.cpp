@@ -4,13 +4,12 @@ import typetorch;
 import fast_io;
 
 #include "../test_support.inc"
+#include "../../src/torch_macros.inc"
 
 namespace {
 
-using Input23 = typetorch::Tensor<typetorch::Shape<2, 3>, typetorch::DType::F32,
-                                   typetorch::Device::CPU, typetorch::Layout::Contiguous>;
-using Input224 = typetorch::Tensor<typetorch::Shape<2, 2, 4>, typetorch::DType::F32,
-                                    typetorch::Device::CPU, typetorch::Layout::Contiguous>;
+using Input23 = TYPETORCH_TENSOR((2, 3));
+using Input224 = TYPETORCH_TENSOR((2, 2, 4));
 
 
 
@@ -29,7 +28,7 @@ int main() {
 
         auto input = ::torch::randn({2, 3}, typetorch_test::f32_cpu_options());
         auto expected = raw->forward(input);
-        auto actual = typed->forward(Input23::unsafe_retain(input));
+        auto actual = typed->forward(TYPETORCH_RETAIN(input, (2, 3)));
 
         if (!::torch::allclose(actual.unsafe_raw(), expected)) {
             ::fast_io::io::perrln("layernorm_affine: mismatch");
@@ -46,7 +45,7 @@ int main() {
 
         auto input = ::torch::randn({2, 2, 4}, typetorch_test::f32_cpu_options());
         auto expected = raw->forward(input);
-        auto actual = typed->forward(Input224::unsafe_retain(input));
+        auto actual = typed->forward(TYPETORCH_RETAIN(input, (2, 2, 4)));
 
         if (!::torch::allclose(actual.unsafe_raw(), expected)) {
             ::fast_io::io::perrln("layernorm_no_affine: mismatch");

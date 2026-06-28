@@ -4,6 +4,8 @@ import typetorch.examples;
 import typetorch;
 import fast_io;
 
+#include "../src/torch_macros.inc"
+
 namespace
 {
 ::torch::Tensor tensor(::std::initializer_list<float> values)
@@ -74,15 +76,9 @@ int main()
 	::fast_io::io::println("numel_plus: ",
 						   typetorch_examples::numel_plus(rows_t, 4));
 
-	using StaticVector =
-		typetorch::Tensor<typetorch::Shape<6>, typetorch::DType::F32,
-						  typetorch::Device::CPU, typetorch::Layout::Contiguous>;
-	using StaticMatrix =
-		typetorch::Tensor<typetorch::Shape<2, 3>, typetorch::DType::F32,
-						  typetorch::Device::CPU, typetorch::Layout::Contiguous>;
-	using StaticCube =
-		typetorch::Tensor<typetorch::Shape<2, 3, 4>, typetorch::DType::F32,
-						  typetorch::Device::CPU, typetorch::Layout::Contiguous>;
+	using StaticVector = TYPETORCH_TENSOR((6));
+	using StaticMatrix = TYPETORCH_TENSOR((2, 3));
+	using StaticCube = TYPETORCH_TENSOR((2, 3, 4));
 
 	auto options{::torch::TensorOptions().dtype(::torch::kFloat).device(::torch::kCPU)};
 	auto matrix_raw{::torch::arange(6, options).view({2, 3})};
@@ -108,7 +104,7 @@ int main()
 			.unwrap());
 	print_tensor_summary(
 		"unsafe_retain_raw",
-		StaticMatrix::unsafe_retain(matrix_raw).unsafe_raw());
+		TYPETORCH_RETAIN(matrix_raw, (2, 3)).unsafe_raw());
 	print_tensor_summary(
 		"add_scalar",
 		::std::move(StaticMatrix::retain(matrix_raw)
