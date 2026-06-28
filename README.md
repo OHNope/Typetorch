@@ -61,6 +61,87 @@ Typetorch moves these checks **earlier**:
 The runtime cost is **zero**: all wrapper methods are unconditionally inlined,
 forwarding directly to the underlying LibTorch call.
 
+
+## Project Layout
+
+```text
+.
+|-- README.md                         # project overview, quick start, and user-facing guide
+|-- xmake.lua                         # main build graph and local configuration loading
+|-- xmake_package.lua                 # local xmake package recipe for downstream projects
+|-- xmake_typetorch_modules.lua       # module source lists used by the build/package rules
+|-- typetorch.local.example.lua       # template for machine-local xmake settings
+|-- scripts/
+|   |-- env.sh                        # environment setup; source this before xmake in this repo
+|   |-- env.local.example.sh          # template for GCC/xmake/Python local paths
+|   |-- check_env.sh                  # sanity checks for the configured toolchain
+|   |-- build.sh                      # convenience build wrapper
+|   |-- bootstrap_xmake.sh            # xmake bootstrap helper
+|   `-- nm_size_probe.sh              # binary size inspection helper
+|-- src/
+|   |-- typetorch/                    # public module and typed LibTorch wrapper modules
+|   |-- bindings/                     # C/Python bridge modules and extension entry points
+|   |-- examples/                     # importable example module used by debug/demo targets
+|   |-- libtorch.mpp                  # LibTorch module boundary
+|   |-- fast_io.mpp                   # fast_io module boundary
+|   |-- *.inc                         # macro/include fragments used by examples and generated wrappers
+|   `-- test.cpp                      # in-repo debug executable source
+|-- examples/                         # small standalone source examples
+|-- tests/
+|   |-- *_test.cpp                    # focused runtime/compile-time behavior tests
+|   |-- nnmodules/                    # typed NN module coverage
+|   |-- package-consumer/             # downstream package-consumer smoke project
+|   |-- factory_options_bench/        # factory option implementation comparison
+|   |-- index_range_bench/            # index range reflection benchmark
+|   `-- cvref/                        # cv/ref meta-vs-trait benchmark
+|-- benchmarks/                       # standalone forwarding overhead benchmark
+|-- docs/                             # API, design, examples, performance notes, and implementation reports
+|-- packages/                         # local xmake package cache/recipes created during development
+`-- third_party/fast_io/              # vendored fast_io dependency
+```
+
+`src/typetorch/` is split into the public module entry point, shared metadata
+utilities, and two implementation subdirectories:
+
+```text
+src/typetorch/
+|-- typetorch.mpp                     # public `import typetorch;` entry point
+|-- common.mpp                        # shared concepts, helpers, and compile-time utilities
+|-- types.mpp                         # dtype, device, layout, and shape-facing public types
+|-- shape_meta.mpp                    # shape arithmetic and compile-time metadata rules
+|-- runtime_checks.mpp                # boundary validation for retained LibTorch values
+|-- torch_mappings.mpp                # mappings between Typetorch metadata and LibTorch metadata
+|-- tensor/
+|   |-- tensor.mpp                    # typed tensor wrapper facade
+|   |-- core.mpp                      # ownership, retain/unwrap, and common member behavior
+|   |-- factory.mpp                   # typed factory helpers such as zeros/ones/randn
+|   |-- arithmetic.mpp                # arithmetic forwarding and result metadata deduction
+|   |-- view.mpp                      # reshape, flatten, transpose, permute, and layout tracking
+|   `-- nn.mpp                        # tensor-side helpers used by typed neural-network wrappers
+`-- nnModules/
+    |-- nnModules.mpp                 # aggregate import for typed neural-network wrappers
+    |-- core.mpp                      # base wrapper contracts and module holder helpers
+    |-- linear.mpp                    # Linear wrapper
+    |-- conv2d.mpp                    # Conv2d wrapper
+    |-- embedding.mpp                 # Embedding wrapper
+    |-- flatten.mpp                   # Flatten wrapper
+    |-- pooling.mpp                   # pooling wrappers
+    |-- activation.mpp                # activation wrappers
+    |-- layer_norm.mpp                # LayerNorm wrapper
+    |-- rms_norm.mpp                  # RMSNorm wrapper
+    |-- sequential.mpp                # typed Sequential composition
+    |-- mlp.mpp                       # MLP building block
+    |-- cnn.mpp                       # CNN building block
+    `-- transformer.mpp               # Transformer building block
+```
+
+The public import path is `import typetorch;`, implemented by
+`src/typetorch/typetorch.mpp`. Most tensor-facing behavior lives under
+`src/typetorch/tensor/`; shape and contract metadata are in
+`src/typetorch/shape_meta.mpp`, `src/typetorch/types.mpp`, and
+`src/typetorch/runtime_checks.mpp`. Typed neural-network wrappers live under
+`src/typetorch/nnModules/`.
+
 ## The Type System
 
 ```cpp
