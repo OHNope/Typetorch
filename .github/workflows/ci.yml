@@ -28,6 +28,13 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       run: ${{ steps.changes.outputs.run }}
+      need_packages: ${{ steps.changes.outputs.need_packages }}
+      sdk_debug: ${{ steps.changes.outputs.sdk_debug }}
+      cpp_tests: ${{ steps.changes.outputs.cpp_tests }}
+      coverage: ${{ steps.changes.outputs.coverage }}
+      capi: ${{ steps.changes.outputs.capi }}
+      size_probes: ${{ steps.changes.outputs.size_probes }}
+      package_consumer: ${{ steps.changes.outputs.package_consumer }}
     steps:
       - name: Check out repository history
         uses: actions/checkout@v5
@@ -42,8 +49,21 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.sha }}
         run: |
+          emit_all() {
+            {
+              echo "run=true"
+              echo "need_packages=true"
+              echo "sdk_debug=true"
+              echo "cpp_tests=true"
+              echo "coverage=true"
+              echo "capi=true"
+              echo "size_probes=true"
+              echo "package_consumer=true"
+            } >> "$GITHUB_OUTPUT"
+          }
+
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
+            emit_all
             exit 0
           fi
 
@@ -54,29 +74,96 @@ jobs:
           fi
 
           if [ -z "$base" ] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
+            emit_all
             exit 0
           fi
 
           run=false
+          need_packages=false
+          sdk_debug=false
+          cpp_tests=false
+          coverage=false
+          capi=false
+          size_probes=false
+          package_consumer=false
+
+          mark_all_builds() {
+            run=true
+            need_packages=true
+            sdk_debug=true
+            cpp_tests=true
+            coverage=true
+            capi=true
+            size_probes=true
+            package_consumer=true
+          }
+
           while IFS= read -r path; do
             case "$path" in
               README.md|LICENSE|AGENTS.md|docs/*|.vscode/*|\
               .gitignore|.clang-format|.clangd)
                 ;;
-              *)
+              .github/workflows/*|.github/actions/*)
                 run=true
-                break
+                ;;
+              xmake.lua|xmake_package.lua|xmake_typetorch_modules.lua|packages/*|packages/**|\
+              scripts/*|scripts/**|third_party/*|third_party/**)
+                mark_all_builds
+                ;;
+              src/bindings/*|src/bindings/**)
+                run=true
+                need_packages=true
+                capi=true
+                ;;
+              src/*|src/**)
+                mark_all_builds
+                ;;
+              examples/*|examples/**)
+                run=true
+                need_packages=true
+                sdk_debug=true
+                cpp_tests=true
+                coverage=true
+                ;;
+              tests/package-consumer/*|tests/package-consumer/**)
+                run=true
+                need_packages=true
+                package_consumer=true
+                ;;
+              tests/binary_size_*)
+                run=true
+                need_packages=true
+                sdk_debug=true
+                size_probes=true
+                ;;
+              tests/*|tests/**)
+                run=true
+                need_packages=true
+                sdk_debug=true
+                cpp_tests=true
+                coverage=true
+                ;;
+              *)
+                mark_all_builds
                 ;;
             esac
           done < <(git diff --name-only "$base" "$HEAD_SHA")
 
-          echo "run=$run" >> "$GITHUB_OUTPUT"
+          {
+            echo "run=$run"
+            echo "need_packages=$need_packages"
+            echo "sdk_debug=$sdk_debug"
+            echo "cpp_tests=$cpp_tests"
+            echo "coverage=$coverage"
+            echo "capi=$capi"
+            echo "size_probes=$size_probes"
+            echo "package_consumer=$package_consumer"
+          } >> "$GITHUB_OUTPUT"
 
   package-cache:
     name: Prepare xmake package cache
     needs: changes
-    if: needs.changes.outputs.run == 'true'
+    if: needs.changes.outputs.need_packages == 'true'
     runs-on: ubuntu-24.04
     container:
       image: gcc:16
@@ -148,10 +235,88 @@ jobs:
           path: ~/.xmake/packages
           key: ${{ steps.xmake-package-cache.outputs.cache-primary-key }}
 
+  sdk-debug:
+    name: Build Typetorch SDK (debug)
+    needs: [changes, package-cache]
+    if: needs.changes.outputs.sdk_debug == 'true' && needs.package-cache.result == 'success'
+    runs-on: ubuntu-24.04
+    container:
+      image: gcc:16
+    timeout-minutes: 120
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Install system packages
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates curl unzip git file binutils \
+            python3 python3-dev python3-venv pkg-config
+          rm -rf /var/lib/apt/lists/*
+
+      - name: Restore xmake installation
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/.local/bin/xmake
+            ~/.local/bin/xrepo
+            ~/.local/share/xmake
+          key: ${{ runner.os }}-gcc16-xmake-install-${{ hashFiles('scripts/bootstrap_xmake.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-gcc16-xmake-install-
+
+      - name: Restore xmake packages
+        uses: actions/cache/restore@v5
+        with:
+          path: ~/.xmake/packages
+          key: ${{ runner.os }}-gcc16-xmake-packages-cpu-${{ hashFiles('xmake.lua', 'xmake_package.lua', 'packages/**/xmake.lua') }}
+
+      - name: Install xmake
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          if ! command -v xmake >/dev/null 2>&1; then
+            bash scripts/bootstrap_xmake.sh
+          fi
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          xmake --version
+
+      - name: Configure Python include path
+        run: |
+          echo "PYTHON=$PYTHON" >> "$GITHUB_ENV"
+          python_include="$($PYTHON -c 'import sysconfig; print(sysconfig.get_path("include"))')"
+          echo "PYTHON_INCLUDE_DIR=$python_include" >> "$GITHUB_ENV"
+
+      - name: Configure debug build
+        run: |
+          source scripts/env.sh
+          xmake f -m debug --yes --python="$PYTHON"
+
+      - name: Build SDK
+        run: |
+          source scripts/env.sh
+          xmake build -j "$BUILD_JOBS" typetorch_sdk
+
+      - name: Upload SDK build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: typetorch-sdk-debug
+          path: |
+            .xmake/linux/x86_64
+            build/.deps/typetorch_sdk
+            build/.gens/typetorch_sdk
+            build/.objs/typetorch_sdk
+            build/linux/x86_64/debug/libtypetorch_sdk.a
+          include-hidden-files: true
+          compression-level: 1
+          retention-days: 1
+
   cpp-tests:
     name: Build and run C++ tests (${{ matrix.suite }})
-    needs: [changes, package-cache]
-    if: needs.changes.outputs.run == 'true' && needs.package-cache.result == 'success'
+    needs: [changes, package-cache, sdk-debug]
+    if: needs.changes.outputs.cpp_tests == 'true' && needs.package-cache.result == 'success' && needs.sdk-debug.result == 'success'
     runs-on: ubuntu-24.04
     container:
       image: gcc:16
@@ -227,6 +392,12 @@ jobs:
           source scripts/env.sh
           xmake f -m debug --yes --python="$PYTHON"
 
+      - name: Download SDK build artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: typetorch-sdk-debug
+          path: .
+
       - name: Check environment
         run: |
           source scripts/env.sh
@@ -249,7 +420,7 @@ jobs:
   coverage:
     name: Generate and upload coverage
     needs: [changes, package-cache]
-    if: needs.changes.outputs.run == 'true' && needs.package-cache.result == 'success'
+    if: needs.changes.outputs.coverage == 'true' && needs.package-cache.result == 'success'
     runs-on: ubuntu-24.04
     container:
       image: gcc:16
@@ -308,6 +479,7 @@ jobs:
       - name: Build and run coverage tests
         run: |
           source scripts/env.sh
+          xmake build -j "$BUILD_JOBS" typetorch_sdk
           test_targets=(
             typetorch_cpp_debug
             typetorch_tensor_arithmetic_test
@@ -353,7 +525,7 @@ jobs:
   capi-extension:
     name: Build Python C API extension
     needs: [changes, package-cache]
-    if: needs.changes.outputs.run == 'true' && needs.package-cache.result == 'success'
+    if: needs.changes.outputs.capi == 'true' && needs.package-cache.result == 'success'
     runs-on: ubuntu-24.04
     container:
       image: gcc:16
@@ -416,8 +588,8 @@ jobs:
 
   size-probes:
     name: Size probe (${{ matrix.probe }})
-    needs: [changes, package-cache]
-    if: needs.changes.outputs.run == 'true' && needs.package-cache.result == 'success'
+    needs: [changes, package-cache, sdk-debug]
+    if: needs.changes.outputs.size_probes == 'true' && needs.package-cache.result == 'success' && needs.sdk-debug.result == 'success'
     runs-on: ubuntu-24.04
     container:
       image: gcc:16
@@ -492,6 +664,12 @@ jobs:
           source scripts/env.sh
           xmake f -m debug --yes --python="$PYTHON"
 
+      - name: Download SDK build artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: typetorch-sdk-debug
+          path: .
+
       - name: Build size probe
         run: |
           source scripts/env.sh
@@ -519,7 +697,7 @@ jobs:
   package-consumer:
     name: Test add_requires() package consumption
     needs: [changes, package-cache]
-    if: needs.changes.outputs.run == 'true' && needs.package-cache.result == 'success'
+    if: needs.changes.outputs.package_consumer == 'true' && needs.package-cache.result == 'success'
     runs-on: ubuntu-24.04
     container:
       image: gcc:16
