@@ -235,7 +235,6 @@ jobs:
       - name: Build C++ test targets
         run: |
           source scripts/env.sh
-          xmake build -j "$BUILD_JOBS" typetorch_sdk
           for target in $TEST_TARGETS; do
             xmake build -j "$BUILD_JOBS" "$target"
           done
@@ -309,7 +308,6 @@ jobs:
       - name: Build and run coverage tests
         run: |
           source scripts/env.sh
-          xmake build -j "$BUILD_JOBS" typetorch_sdk
           test_targets=(
             typetorch_cpp_debug
             typetorch_tensor_arithmetic_test
@@ -343,7 +341,7 @@ jobs:
             build
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
@@ -497,7 +495,6 @@ jobs:
       - name: Build size probe
         run: |
           source scripts/env.sh
-          xmake build -j "$BUILD_JOBS" typetorch_sdk
           xmake build -j "$BUILD_JOBS" "$PROBE_TARGET"
 
       - name: Inspect size probe

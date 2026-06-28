@@ -294,7 +294,7 @@ target("typetorch_sdk")
 target_end()
 
 target("typetorch_cpp_debug")
-    configure_libtorch_target({
+    configure_typetorch_consumer_target({
         examples = true,
         files = {"examples/cpp_debug.cpp"},
     })
