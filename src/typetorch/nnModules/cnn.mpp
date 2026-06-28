@@ -1,0 +1,337 @@
+export module typetorch:nnModules_cnn;
+
+import std;
+import libtorch;
+import :types;
+import :common;
+import :tensor;
+import :nnModules_core;
+import :nnModules_conv2d;
+import :nnModules_linear;
+
+#include "attributes.inc"
+
+export namespace typetorch
+{
+
+namespace detail
+{
+
+template <ShapeLike ShapeKind>
+consteval inline auto shape_dims_all_positive() noexcept -> bool
+{
+	for (::std::int64_t dim : ShapeKind::dims)
+	{
+		if (dim <= 0)
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+template <ShapeLike Channels, ShapeLike KernelSize, ShapeLike Padding,
+		  DType dtype, Device device, ::std::size_t... I>
+auto cnn_convs_type(::std::index_sequence<I...>)
+	-> ::std::tuple<
+		Conv2d<Channels::dims[I], Channels::dims[I + 1], KernelSize,
+			   Shape<1, 1>, Padding, Shape<1, 1>, 1, dtype, device>...>;
+
+template <ShapeLike Channels, ShapeLike KernelSize, ShapeLike Padding,
+		  DType dtype, Device device>
+using CNNConvs = decltype(cnn_convs_type<Channels, KernelSize, Padding,
+										 dtype, device>(
+	::std::make_index_sequence<
+		Channels::rank >= 2 ? Channels::rank - 1 : 0>{}));
+
+template <ShapeLike Channels, ::std::int64_t NumClasses,
+		  ShapeLike KernelSize = Shape<3, 3>,
+		  ShapeLike Padding = Shape<1, 1>,
+		  ShapeLike PoolOutput = Shape<1, 1>,
+		  DType dtype = DType::F32, Device device = Device::CPU>
+struct TypedCNNImpl : ::torch::nn::Module
+{
+	static_assert(Channels::rank >= 2,
+				  "TypedCNN channels must contain input and at least one hidden width");
+	static_assert(shape_dims_all_positive<Channels>(),
+				  "TypedCNN channel dimensions must be positive");
+	static_assert(NumClasses > 0, "TypedCNN num_classes must be positive");
+	static_assert(KernelSize::rank == 2,
+				  "TypedCNN kernel_size must have rank 2");
+	static_assert(Padding::rank == 2, "TypedCNN padding must have rank 2");
+	static_assert(PoolOutput::rank == 2,
+				  "TypedCNN pool_output must have rank 2");
+	static_assert(KernelSize::dynamic_rank == 0,
+				  "TypedCNN kernel_size must be fully static");
+	static_assert(Padding::dynamic_rank == 0,
+				  "TypedCNN padding must be fully static");
+	static_assert(PoolOutput::dynamic_rank == 0,
+				  "TypedCNN pool_output must be fully static");
+	static_assert(shape_dims_all_positive<KernelSize>(),
+				  "TypedCNN kernel_size dimensions must be positive");
+	static_assert(Padding::dims[0] >= 0 && Padding::dims[1] >= 0,
+				  "TypedCNN padding dimensions must be non-negative");
+	static_assert(shape_dims_all_positive<PoolOutput>(),
+				  "TypedCNN pool_output dimensions must be positive");
+	static_assert(dtype != DType::Any,
+				  "TypedCNN parameters require a concrete dtype");
+	static_assert(device != Device::Any,
+				  "TypedCNN parameters require a concrete device");
+	static_assert(::typetorch::detail::is_floating_dtype(dtype),
+				  "TypedCNN parameters require a floating dtype");
+
+	static constexpr ::std::size_t conv_count{Channels::rank - 1};
+	static constexpr ::std::int64_t input_channels{Channels::dims[0]};
+	static constexpr ::std::int64_t feature_channels{
+		Channels::dims[Channels::rank - 1]};
+	static constexpr ::std::int64_t pooled_features{
+		feature_channels * PoolOutput::dims[0] * PoolOutput::dims[1]};
+
+	using Convs = CNNConvs<Channels, KernelSize, Padding, dtype, device>;
+	using ConvBiases = ::std::array<bool, conv_count>;
+	using Classifier = Linear<pooled_features, NumClasses, dtype, device>;
+
+	TypedCNNImpl()
+		: TypedCNNImpl(true, true)
+	{
+	}
+
+	explicit TypedCNNImpl(bool with_bias)
+		: TypedCNNImpl(with_bias, with_bias)
+	{
+	}
+
+	TypedCNNImpl(bool with_conv_bias, bool with_classifier_bias)
+		: TypedCNNImpl(make_conv_biases(with_conv_bias),
+					   with_classifier_bias)
+	{
+	}
+
+	explicit TypedCNNImpl(ConvBiases const &conv_biases,
+						  bool with_classifier_bias = true)
+		: TypedCNNImpl(make_convs(conv_biases),
+					   Classifier{with_classifier_bias})
+	{
+	}
+
+	explicit TypedCNNImpl(Convs convs, Classifier classifier)
+		: convs_{::std::move(convs)}, classifier_{::std::move(classifier)}
+	{
+		register_layers();
+	}
+
+	template <TensorLike Input>
+	[[nodiscard]] TYPETORCH_HOT inline auto forward(Input const &input)
+	{
+		using InputShape = typename Input::shape;
+		static_assert(InputShape::rank == 4,
+					  "TypedCNN expects NCHW rank-4 input");
+		static_assert(InputShape::dims[1] == dyn ||
+						  InputShape::dims[1] == input_channels,
+					  "TypedCNN input channel dimension must match channels[0]");
+		static_assert(Input::dtype == DType::Any ||
+						  ::typetorch::detail::is_floating_dtype(Input::dtype),
+					  "TypedCNN input requires floating tensor dtype");
+		static_assert(Input::dtype == DType::Any || Input::dtype == dtype,
+					  "TypedCNN input dtype must match parameter dtype");
+		static_assert(Input::device == Device::Any || Input::device == device,
+					  "TypedCNN input device must match parameter device");
+
+		using Result =
+			Tensor<Shape<InputShape::dims[0], NumClasses>, dtype, device,
+				   Layout::Any>;
+
+		::torch::Tensor output{input.unsafe_raw()};
+		template for (constexpr ::std::size_t I :
+					  ::std::views::iota(::std::size_t{}, conv_count))
+		{
+			output = ::torch::relu(::std::get<I>(convs_)->forward(output));
+		}
+		output = ::torch::adaptive_avg_pool2d(
+			output, ::std::array<::std::int64_t, 2>{
+						PoolOutput::dims[0], PoolOutput::dims[1]});
+		output = output.flatten(1, -1);
+		return Result::unsafe_move(classifier_->forward(output));
+	}
+
+	template <::std::size_t Index>
+	[[nodiscard]] inline auto get_conv() noexcept -> auto &
+	{
+		static_assert(Index < conv_count, "TypedCNN conv index out of range");
+		return ::std::get<Index>(convs_);
+	}
+
+	template <::std::size_t Index>
+	[[nodiscard]] inline auto get_conv() const noexcept -> auto const &
+	{
+		static_assert(Index < conv_count, "TypedCNN conv index out of range");
+		return ::std::get<Index>(convs_);
+	}
+
+	[[nodiscard]] inline auto classifier() noexcept -> auto &
+	{
+		return classifier_;
+	}
+
+	[[nodiscard]] inline auto classifier() const noexcept -> auto const &
+	{
+		return classifier_;
+	}
+
+	template <Device ndevice, DType ndtype = dtype>
+	[[nodiscard]] inline auto to() const
+	{
+		using ResultImpl =
+			TypedCNNImpl<Channels, NumClasses, KernelSize, Padding,
+						 PoolOutput, ndtype, ndevice>;
+		return ::std::make_shared<ResultImpl>(
+			converted_convs<ndevice, ndtype>(
+				::std::make_index_sequence<conv_count>{}),
+			classifier_.template to<ndevice, ndtype>());
+	}
+
+	template <DType ndtype>
+	[[nodiscard]] inline auto to() const
+	{
+		return to<device, ndtype>();
+	}
+
+	static constexpr ::std::int64_t num_classes{NumClasses};
+	static constexpr DType dtype_kind{dtype};
+	static constexpr Device device_kind{device};
+
+private:
+	static constexpr auto make_conv_biases(bool value) -> ConvBiases
+	{
+		ConvBiases result{};
+		result.fill(value);
+		return result;
+	}
+
+	template <::std::size_t... I>
+	static auto make_convs_impl(ConvBiases const &biases,
+								::std::index_sequence<I...>) -> Convs
+	{
+		return Convs{
+			Conv2d<Channels::dims[I], Channels::dims[I + 1], KernelSize,
+				   Shape<1, 1>, Padding, Shape<1, 1>, 1, dtype, device>{
+				biases[I]}...};
+	}
+
+	static auto make_convs(ConvBiases const &biases) -> Convs
+	{
+		return make_convs_impl(
+			biases, ::std::make_index_sequence<conv_count>{});
+	}
+
+	template <Device ndevice, DType ndtype, ::std::size_t... I>
+	[[nodiscard]] inline auto
+	converted_convs(::std::index_sequence<I...>) const
+		-> typename TypedCNNImpl<Channels, NumClasses, KernelSize, Padding,
+								 PoolOutput, ndtype, ndevice>::Convs
+	{
+		return {::std::get<I>(convs_).template to<ndevice, ndtype>()...};
+	}
+
+	void register_layers()
+	{
+		template for (constexpr ::std::size_t I :
+					  ::std::views::iota(::std::size_t{}, conv_count))
+		{
+			this->register_module(::std::string{"conv"} + ::std::to_string(I),
+								  ::std::get<I>(convs_));
+		}
+		this->register_module("classifier", classifier_);
+	}
+
+	Convs convs_;
+	Classifier classifier_;
+};
+
+} // namespace detail
+
+template <ShapeLike Channels, ::std::int64_t NumClasses,
+		  ShapeLike KernelSize = Shape<3, 3>,
+		  ShapeLike Padding = Shape<1, 1>,
+		  ShapeLike PoolOutput = Shape<1, 1>,
+		  DType dtype = DType::F32, Device device = Device::CPU>
+class TypedCNN
+	: public ::torch::nn::ModuleHolder<
+		  detail::TypedCNNImpl<Channels, NumClasses, KernelSize, Padding,
+							   PoolOutput, dtype, device>>
+{
+public:
+	using Impl =
+		detail::TypedCNNImpl<Channels, NumClasses, KernelSize, Padding,
+							 PoolOutput, dtype, device>;
+	using Base = ::torch::nn::ModuleHolder<Impl>;
+	using ConvBiases = typename Impl::ConvBiases;
+	using Base::Base;
+
+	TypedCNN()
+		: Base()
+	{
+	}
+
+	explicit TypedCNN(bool with_bias)
+		: Base(with_bias)
+	{
+	}
+
+	TypedCNN(bool with_conv_bias, bool with_classifier_bias)
+		: Base(with_conv_bias, with_classifier_bias)
+	{
+	}
+
+	explicit TypedCNN(ConvBiases const &conv_biases,
+					  bool with_classifier_bias = true)
+		: Base(conv_biases, with_classifier_bias)
+	{
+	}
+
+	template <::std::size_t Index>
+	[[nodiscard]] inline auto get_conv() noexcept -> auto &
+	{
+		return this->ptr()->template get_conv<Index>();
+	}
+
+	template <::std::size_t Index>
+	[[nodiscard]] inline auto get_conv() const noexcept -> auto const &
+	{
+		return this->ptr()->template get_conv<Index>();
+	}
+
+	[[nodiscard]] inline auto classifier() noexcept -> auto &
+	{
+		return this->ptr()->classifier();
+	}
+
+	[[nodiscard]] inline auto classifier() const noexcept -> auto const &
+	{
+		return this->ptr()->classifier();
+	}
+
+	template <Device ndevice, DType ndtype = dtype>
+	[[nodiscard]] inline auto to() const
+	{
+		return TypedCNN<Channels, NumClasses, KernelSize, Padding, PoolOutput,
+						ndtype, ndevice>{
+			this->ptr()->template to<ndevice, ndtype>()};
+	}
+
+	template <DType ndtype>
+	[[nodiscard]] inline auto to() const
+	{
+		return to<device, ndtype>();
+	}
+
+	static constexpr ::std::size_t conv_count{Impl::conv_count};
+	static constexpr ::std::int64_t input_channels{Impl::input_channels};
+	static constexpr ::std::int64_t feature_channels{Impl::feature_channels};
+	static constexpr ::std::int64_t pooled_features{Impl::pooled_features};
+	static constexpr ::std::int64_t num_classes{NumClasses};
+	static constexpr DType dtype_kind{dtype};
+	static constexpr Device device_kind{device};
+};
+
+} // namespace typetorch

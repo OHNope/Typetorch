@@ -398,6 +398,13 @@ target("typetorch_nnmodules_mlp_test")
     })
 target_end()
 
+target("typetorch_nnmodules_cnn_test")
+    configure_typetorch_consumer_target({
+        default = false,
+        files = {"tests/nnmodules/cnn_test.cpp"},
+    })
+target_end()
+
 target("typetorch_nnmodules_transformer_test")
     configure_typetorch_consumer_target({
         default = false,
