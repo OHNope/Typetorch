@@ -36,6 +36,13 @@ static_assert(::std::same_as<decltype(Matrix::arange<0, 6, 2, typetorch::DType::
 static_assert(::std::same_as<decltype(::std::declval<Matrix &&>().transpose<0, 1>()), MatrixT>);
 static_assert(::std::same_as<decltype(::std::declval<Cube &&>().permute<0, 2, 1>()), CubePermuted>);
 static_assert(::std::same_as<decltype(::std::declval<CubePermuted &&>().contiguous()), CubePermutedContiguous>);
+static_assert(::std::same_as<decltype(::std::declval<Matrix &&>().contiguous()), Matrix>);
+static_assert(::std::same_as<decltype(::std::declval<Matrix const &>().detach()), Matrix>);
+static_assert(!noexcept(::std::declval<Matrix const &>().sizes()));
+static_assert(::std::same_as<
+	decltype(::std::declval<Matrix &>().unsafe_wrap(
+		::std::declval<::torch::Tensor &&>())),
+	Matrix>);
 static_assert(::std::same_as<decltype(::std::declval<Matrix &&>().view<6>()), Vector6>);
 static_assert(::std::same_as<decltype(::std::declval<Matrix &&>().reshape<6>()), Vector6>);
 static_assert(::std::same_as<decltype(::std::declval<CubePermuted &&>().reshape<2, 12>()), Reshaped>);
@@ -88,6 +95,12 @@ int main()
 		"reshape_contiguous",
 		TYPETORCH_RETAIN(matrix, (2, 3)).reshape<6>().unsafe_raw(),
 		matrix.reshape({6}));
+	typetorch_test::expect_allclose(
+		"contiguous_already_contiguous",
+		TYPETORCH_RETAIN(matrix, (2, 3)).contiguous().unsafe_raw(), matrix);
+	typetorch_test::expect_allclose(
+		"detach",
+		TYPETORCH_RETAIN(matrix, (2, 3)).detach().unsafe_raw(), matrix.detach());
 	typetorch_test::expect_allclose(
 		"flatten",
 		TYPETORCH_RETAIN(matrix, (2, 3)).flatten<>().unsafe_raw(),

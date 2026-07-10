@@ -64,7 +64,7 @@ template <::std::int64_t... Dims>
 [[nodiscard]] TYPETORCH_HOT inline auto Tensor<ShapeKind, DTypeKind, DeviceKind, LayoutKind>::reshape() &&
     requires(layout != Layout::Contiguous)
 {
-    return contiguous().template view<Dims...>();
+    return ::std::move(*this).contiguous().template view<Dims...>();
 }
 
 // flatten

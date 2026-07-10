@@ -82,7 +82,7 @@ public:
 		return ::std::move(impl_);
 	}
 
-	[[nodiscard]] inline auto sizes() const noexcept -> ::std::vector<::std::int64_t>
+	[[nodiscard]] inline auto sizes() const -> ::std::vector<::std::int64_t>
 	{
 		return impl_.sizes().vec();
 	}
@@ -100,9 +100,9 @@ public:
 			  DType dtype = DType::F32, Device device = Device::CPU>
 	[[nodiscard]] static inline auto arange();
 
-	inline auto detach()
+	[[nodiscard]] inline auto detach() const -> Tensor
 	{
-		return impl_.detach();
+		return unsafe_move(impl_.detach());
 	}
 
 	[[nodiscard]] static inline auto retain(::torch::Tensor const &raw) -> Tensor
@@ -124,13 +124,13 @@ public:
 		return Tensor(::std::move(raw));
 	}
 
-	[[nodiscard]] TYPETORCH_HOT inline auto contiguous() const noexcept
+	[[nodiscard]] TYPETORCH_HOT inline auto contiguous() && noexcept
 		requires(layout == Layout::Contiguous)
 	{
-		return *this;
+		return ::std::move(*this);
 	}
 
-	[[nodiscard]] TYPETORCH_HOT inline auto contiguous()
+	[[nodiscard]] TYPETORCH_HOT inline auto contiguous() &&
 		requires(layout != Layout::Contiguous)
 	{
 		using Result = Tensor<shape, dtype, device, Layout::Contiguous>;
@@ -172,7 +172,7 @@ public:
 
 	[[nodiscard]] TYPETORCH_ALWAYS_INLINE auto unsafe_wrap(::torch::Tensor &&raw) noexcept
 	{
-		return unsafe_move(raw);
+		return unsafe_move(::std::move(raw));
 	}
 
 	// ====== Factory methods — defined in :tensor_factory ======
