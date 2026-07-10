@@ -1,4 +1,4 @@
-Parts of the README, CI configuration, benchmarks, scripts, and repetitive code such as macro boilerplate and consteval type-deduction helpers were drafted with GPT-5.5. I designed and verified the type model, ownership semantics, and final code.
+For transparency: GPT-5.5 helped draft parts of the README, CI configuration, benchmarks, scripts, and repetitive code such as macro boilerplate and consteval type-deduction helpers. The project design, type model, ownership semantics, and final code decisions were designed and verified by me.
 
 [![CI](https://github.com/OHNope/Typetorch/actions/workflows/ci.yml/badge.svg)](https://github.com/OHNope/Typetorch/actions/workflows/ci.yml) [![codecov](https://codecov.io/gh/OHNope/Typetorch/graph/badge.svg)](https://codecov.io/gh/OHNope/Typetorch) [![C++26](https://img.shields.io/badge/C%2B%2B-26-00599C?logo=cplusplus&logoColor=white)](https://isocpp.org/) [![GCC 16.1](https://img.shields.io/badge/GCC-16.1-6A5ACD?logo=gnu&logoColor=white)](https://gcc.gnu.org/) [![Platform: Linux](https://img.shields.io/badge/platform-Linux-FCC624?logo=linux&logoColor=black)](https://www.kernel.org/)
 # Typetorch
